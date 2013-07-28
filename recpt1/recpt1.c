@@ -459,9 +459,9 @@ reader_func(void *p)
               }
 
               /* 分離対象以外をふるい落とす */
-              splitbuf.buffer = (u_char *)malloc(buf.size);
+              splitbuf.buffer = (u_char *)realloc(splitbuf.buffer,buf.size);
               if (splitbuf.buffer == NULL) {
-                fprintf(stderr, "splitbuf malloc failed.\n");
+                fprintf(stderr, "splitbuf realloc failed.\n");
                 use_splitter = FALSE;
                 goto fin;
               }
@@ -524,10 +524,6 @@ reader_func(void *p)
 
         free(qbuf);
         qbuf = NULL;
-        if (splitbuf.buffer) {
-          free(splitbuf.buffer);
-          splitbuf.buffer = NULL;
-        }
 
         /* normal exit */
         if((f_exit && !p_queue->num_used) || file_err) {
@@ -545,9 +541,9 @@ reader_func(void *p)
             if(use_splitter) {
               /* 分離対象以外をふるい落とす */
               splitbuf.size = 0;
-              splitbuf.buffer = (u_char *)malloc(buf.size);
+              splitbuf.buffer = (u_char *)realloc(splitbuf.buffer,buf.size);
               if (splitbuf.buffer == NULL) {
-                fprintf(stderr, "splitbuf malloc failed.\n");
+                fprintf(stderr, "splitbuf realloc failed.\n");
                 break;
               }
               code = split_ts(splitter, &buf, &splitbuf);
@@ -582,11 +578,6 @@ reader_func(void *p)
                 }
             }
 
-            if (splitbuf.buffer) {
-              free(splitbuf.buffer);
-              splitbuf.buffer = NULL;
-            }
-
             break;
         } // normal exit
     } // while (1)
@@ -595,7 +586,6 @@ reader_func(void *p)
     time(&cur_time);
     fprintf(stderr, "Recorded %dsec\n",
             (int)(cur_time - data->start_time));
-
     return NULL;
 }
 
