@@ -430,23 +430,14 @@ pt3_mx_set_frequency(PT3_MX *mx, __u32 channel, __s32 offset)
 PT3_MX *
 create_pt3_mx(PT3_I2C *i2c, PT3_TC *tc)
 {
-	PT3_MX *mx;
+	PT3_MX *mx = NULL;
 
-	mx = NULL;
-
-	mx = pt3_vzalloc(sizeof(PT3_MX));
-	if (mx == NULL)
-		goto fail;
-
-	mx->i2c = i2c;
-	mx->tc = tc;
-	mx->sleep = 1;
-	
+	if ((mx = pt3_vzalloc(sizeof(PT3_MX)))) {
+		mx->i2c = i2c;
+		mx->tc = tc;
+		mx->sleep = 1;
+	}
 	return mx;
-fail:
-	if (mx != NULL)
-		vfree(mx);
-	return NULL;
 }
 
 void

@@ -397,7 +397,7 @@ pt3_dma_get_status(PT3_DMA *dma)
 
 
 PT3_DMA *
-create_pt3_dma(struct pci_dev *hwdev, PT3_I2C *i2c, int real_index)
+create_pt3_dma(struct pci_dev *pdev, PT3_I2C *i2c, int real_index)
 {
 	PT3_DMA *dma;
 	PT3_DMA_PAGE *page;
@@ -424,7 +424,7 @@ create_pt3_dma(struct pci_dev *hwdev, PT3_I2C *i2c, int real_index)
 		page = &dma->ts_info[i];
 		page->size = BLOCK_SIZE;
 		page->data_pos = 0;
-		page->data = pci_alloc_consistent(hwdev, page->size, &page->addr);
+		page->data = pci_alloc_consistent(pdev, page->size, &page->addr);
 		if (page->data == NULL) {
 			PT3_PRINTK(0, KERN_ERR, "fail allocate consistent. %d\n", i);
 			goto fail;
@@ -442,7 +442,7 @@ create_pt3_dma(struct pci_dev *hwdev, PT3_I2C *i2c, int real_index)
 		page = &dma->desc_info[i];
 		page->size = DMA_PAGE_SIZE;
 		page->data_pos = 0;
-		page->data = pci_alloc_consistent(hwdev, page->size, &page->addr);
+		page->data = pci_alloc_consistent(pdev, page->size, &page->addr);
 		if (page->data == NULL) {
 			PT3_PRINTK(0, KERN_ERR, "fail allocate consistent. %d\n", i);
 			goto fail;
@@ -458,12 +458,12 @@ create_pt3_dma(struct pci_dev *hwdev, PT3_I2C *i2c, int real_index)
 	return dma;
 fail:
 	if (dma != NULL)
-		free_pt3_dma(hwdev, dma);
+		free_pt3_dma(pdev, dma);
 	return NULL;
 }
 
 void
-free_pt3_dma(struct pci_dev *hwdev, PT3_DMA *dma)
+free_pt3_dma(struct pci_dev *pdev, PT3_DMA *dma)
 {
 	PT3_DMA_PAGE *page;
 	__u32 i;
@@ -471,7 +471,7 @@ free_pt3_dma(struct pci_dev *hwdev, PT3_DMA *dma)
 		for (i = 0; i < dma->ts_count; i++) {
 			page = &dma->ts_info[i];
 			if (page->size != 0)
-				pci_free_consistent(hwdev, page->size, page->data, page->addr);
+				pci_free_consistent(pdev, page->size, page->data, page->addr);
 		}
 		kfree(dma->ts_info);
 	}
@@ -479,7 +479,7 @@ free_pt3_dma(struct pci_dev *hwdev, PT3_DMA *dma)
 		for (i = 0; i < dma->desc_count; i++) {
 			page = &dma->desc_info[i];
 			if (page->size != 0)
-				pci_free_consistent(hwdev, page->size, page->data, page->addr);
+				pci_free_consistent(pdev, page->size, page->data, page->addr);
 		}
 		kfree(dma->desc_info);
 	}

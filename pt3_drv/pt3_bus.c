@@ -59,8 +59,7 @@ enum {
 //	_I_DATA_L_ACK1 = I_DATA_H_ACK1 ^ 0x04
 };
 
-static void
-add_instruction(PT3_BUS *bus, __u32 instruction)
+static void add_instruction(PT3_BUS *bus, __u32 instruction)
 {
 	if ((bus->inst_count % 2) == 0) {
 		bus->tmp_inst = instruction;
@@ -215,22 +214,15 @@ create_pt3_bus(void)
 {
 	PT3_BUS *bus;
 
-	bus = pt3_vzalloc(sizeof(PT3_BUS));
-	if (bus == NULL)
-		goto fail;
-
-	bus->inst_addr = 0;
-	bus->read_addr = 0;
-	bus->inst_count = 0;
-	bus->tmp_inst = 0;
-	bus->inst_pos = 0;
-	bus->buf = NULL;
-
+	if ((bus = pt3_vzalloc(sizeof(PT3_BUS)))) {
+		bus->inst_addr = 0;
+		bus->read_addr = 0;
+		bus->inst_count = 0;
+		bus->tmp_inst = 0;
+		bus->inst_pos = 0;
+		bus->buf = NULL;
+	}
 	return bus;
-fail:
-	if (bus != NULL)
-		free_pt3_bus(bus);
-	return NULL;
 }
 
 void
