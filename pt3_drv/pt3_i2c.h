@@ -28,7 +28,7 @@ typedef struct _PT3_I2C {
 } PT3_I2C;
 
 void pt3_i2c_copy(PT3_I2C *i2c, PT3_BUS *bus);
-STATUS pt3_i2c_run(PT3_I2C *i2c, PT3_BUS *bus, __u32 *ack, int copy);
+STATUS pt3_i2c_run(PT3_I2C *i2c, PT3_BUS *bus, int copy);
 int pt3_i2c_is_clean(PT3_I2C *i2c);
 void pt3_i2c_reset(PT3_I2C *i2c);
 

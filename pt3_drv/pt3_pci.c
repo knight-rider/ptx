@@ -343,7 +343,7 @@ init_tuner(PT3_I2C *i2c, PT3_TUNER *tuner)
 			return STATUS_OUT_OF_MEMORY_ERROR;
 		pt3_qm_dummy_reset(tuner->qm, bus);
 		pt3_bus_end(bus);
-		status = pt3_i2c_run(i2c, bus, NULL, 1);
+		status = pt3_i2c_run(i2c, bus, 1);
 		free_pt3_bus(bus);
 		if (status) {
 			PT3_PRINTK(7, KERN_DEBUG, "fail init_tuner dummy reset. status=0x%x\n", status);
@@ -361,7 +361,7 @@ init_tuner(PT3_I2C *i2c, PT3_TUNER *tuner)
 			return status;
 		}
 		pt3_bus_end(bus);
-		status = pt3_i2c_run(i2c, bus, NULL, 1);
+		status = pt3_i2c_run(i2c, bus, 1);
 		free_pt3_bus(bus);
 		if (status) {
 			PT3_PRINTK(7, KERN_DEBUG, "fail init_tuner qm init. status=0x%x\n", status);
@@ -439,7 +439,7 @@ tuner_power_on(pt3_board *pt3, PT3_BUS *bus)
 		pt3_i2c_copy(pt3->i2c, bus);
 
 	bus->inst_addr = PT3_BUS_INST_ADDR1;
-	if ((status = pt3_i2c_run(pt3->i2c, bus, NULL, 0))) {
+	if ((status = pt3_i2c_run(pt3->i2c, bus, 0))) {
 		PT3_PRINTK(7, KERN_INFO, "failed inst_addr=0x%x status=0x%x\n",
 				PT3_BUS_INST_ADDR1, status);
 		goto last;
@@ -471,7 +471,7 @@ init_all_tuner(pt3_board *pt3)
 
 	if (!pt3_i2c_is_clean(i2c)) {
 		PT3_PRINTK(0, KERN_INFO, "cleanup I2C bus.\n");
-		if ((status = pt3_i2c_run(i2c, bus, NULL, 0)))
+		if ((status = pt3_i2c_run(i2c, bus, 0)))
 			goto last;
 		schedule_timeout_interruptible(msecs_to_jiffies(10));
 	}

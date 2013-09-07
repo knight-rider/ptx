@@ -93,7 +93,7 @@ pt3_tc_write(PT3_TC *tc, PT3_BUS *bus, __u8 addr, const __u8 *data, __u32 size)
 		status = STATUS_OK;
 	} else {
 		pt3_bus_end(p);
-		status =  pt3_i2c_run(tc->i2c, p, NULL, 1);
+		status =  pt3_i2c_run(tc->i2c, p, 1);
 	}
 
 	if (!bus)
@@ -130,7 +130,7 @@ tc_read(PT3_TC *tc, PT3_BUS *bus, __u8 addr, __u8 *data, __u32 size)
 		status = STATUS_OK;
 	} else {
 		pt3_bus_end(p);
-		status = pt3_i2c_run(tc->i2c, p, NULL, 1);
+		status = pt3_i2c_run(tc->i2c, p, 1);
 		for (i = 0; i < size; i++)
 			data[i] = pt3_bus_data1(p, rindex + i);
 	}
@@ -175,7 +175,7 @@ pt3_tc_read_tuner_without_addr(PT3_TC *tc, PT3_BUS *bus, __u8 *data, __u32 size)
 		status = STATUS_OK;
 	} else {
 		pt3_bus_end(p);
-		status = pt3_i2c_run(tc->i2c, p, NULL, 1);
+		status = pt3_i2c_run(tc->i2c, p, 1);
 		for (i = 0; i < size; i++)
 			data[i] = pt3_bus_data1(p, rindex + i);
 	}
@@ -216,7 +216,7 @@ pt3_tc_write_tuner_without_addr(PT3_TC *tc, PT3_BUS *bus, const __u8 *data, __u3
 		status = STATUS_OK;
 	else {
 		pt3_bus_end(p);
-		status = pt3_i2c_run(tc->i2c, p, NULL, 1);
+		status = pt3_i2c_run(tc->i2c, p, 1);
 	}
 
 	if (!bus)
@@ -268,7 +268,7 @@ pt3_tc_read_tuner(PT3_TC *tc, PT3_BUS *bus, __u8 addr, __u8 *data, __u32 size)
 		status = STATUS_OK;
 	} else {
 		pt3_bus_end(p);
-		status = pt3_i2c_run(tc->i2c, p, NULL, 1);
+		status = pt3_i2c_run(tc->i2c, p, 1);
 		for (i = 0; i < size; i++)
 			data[i] = pt3_bus_data1(p, rindex + i);
 	}
@@ -311,7 +311,7 @@ pt3_tc_write_tuner(PT3_TC *tc, PT3_BUS *bus, __u8 addr, const __u8 *data, __u32 
 		status = STATUS_OK;
 	else {
 		pt3_bus_end(p);
-		status = pt3_i2c_run(tc->i2c, p, NULL, 1);
+		status = pt3_i2c_run(tc->i2c, p, 1);
 		free_pt3_bus(p);
 	}
 	return status;
