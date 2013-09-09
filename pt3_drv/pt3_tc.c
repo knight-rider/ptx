@@ -319,8 +319,7 @@ pt3_tc_write_tuner(PT3_TC *tc, PT3_BUS *bus, __u8 addr, const __u8 *data, __u32 
 
 /* TC_S */
 
-static STATUS
-write_pskmsrst(PT3_TC *tc, PT3_BUS *bus)
+static STATUS write_pskmsrst(PT3_TC *tc, PT3_BUS *bus)
 {
 	__u8 buf = 0x01;
 	return pt3_tc_write(tc, bus, 0x03, &buf, 1);
@@ -349,11 +348,10 @@ write_imsrst(PT3_TC *tc, PT3_BUS *bus)
 STATUS
 pt3_tc_init_t(PT3_TC *tc, PT3_BUS *bus)
 {
-	__u8 buf;
+	__u8 buf = 0x10;
+	STATUS status = write_imsrst(tc, bus);
 
-	if (!write_imsrst(tc, bus))
-		buf = 0x10;
-	return pt3_tc_write(tc, bus, 0x1c, &buf, 1);
+	return status ? status : pt3_tc_write(tc, bus, 0x1c, &buf, 1);
 }
 
 STATUS
@@ -409,7 +407,7 @@ pt3_tc_set_sleep_s(PT3_TC *tc, PT3_BUS *bus, int sleep)
 }
 
 STATUS
-pt3_tc_set_ts_pins_mode_s(PT3_TC *tc, PT3_BUS *bus, PT3_TS_PINS_MODE *mode)
+pt3_tc_set_ts_pins_mode_s(PT3_TC *tc, PT3_TS_PINS_MODE *mode)
 {
 	__u32	clock_data = mode->clock_data,
 		byte = mode->byte,
@@ -427,13 +425,13 @@ pt3_tc_set_ts_pins_mode_s(PT3_TC *tc, PT3_BUS *bus, PT3_TS_PINS_MODE *mode)
 	data[0] = 0x15 | (valid << 6);
 	data[1] = 0x04 | (clock_data << 4) | byte;
 
-	if ((status = pt3_tc_write(tc, bus, 0x1c, &data[0], 1)))
+	if ((status = pt3_tc_write(tc, NULL, 0x1c, &data[0], 1)))
 		return status;
-	return pt3_tc_write(tc, bus, 0x1f, &data[1], 1);
+	return pt3_tc_write(tc, NULL, 0x1f, &data[1], 1);
 }
 
 STATUS
-pt3_tc_set_ts_pins_mode_t(PT3_TC *tc, PT3_BUS *bus, PT3_TS_PINS_MODE *mode)
+pt3_tc_set_ts_pins_mode_t(PT3_TC *tc, PT3_TS_PINS_MODE *mode)
 {
 	__u32	clock_data = mode->clock_data,
 		byte = mode->byte,
@@ -448,7 +446,7 @@ pt3_tc_set_ts_pins_mode_t(PT3_TC *tc, PT3_BUS *bus, PT3_TS_PINS_MODE *mode)
 		valid++;
 
 	data = (__u8)(0x01 | (clock_data << 6) | (byte << 4) | (valid << 2)) ;
-	return pt3_tc_write(tc, bus, 0x1d, &data, 1);
+	return pt3_tc_write(tc, NULL, 0x1d, &data, 1);
 }
 
 STATUS

@@ -330,8 +330,7 @@ set_tuner_sleep(int isdb, PT3_TUNER *tuner, int sleep)
 	return status;
 }
 
-static STATUS
-init_tuner(PT3_I2C *i2c, PT3_TUNER *tuner)
+static STATUS init_tuner(PT3_I2C *i2c, PT3_TUNER *tuner)
 {
 	STATUS status;
 	PT3_BUS *bus;
@@ -372,8 +371,7 @@ init_tuner(PT3_I2C *i2c, PT3_TUNER *tuner)
 	return status;
 }
 
-static STATUS
-tuner_power_on(pt3_board *pt3, PT3_BUS *bus)
+static STATUS tuner_power_on(pt3_board *pt3, PT3_BUS *bus)
 {
 	STATUS status;
 	int i, j;
@@ -407,13 +405,13 @@ tuner_power_on(pt3_board *pt3, PT3_BUS *bus)
 
 	for (i = 0; i < MAX_TUNER; i++) {
 		tuner = &pt3->tuner[i];
-		status = pt3_tc_set_ts_pins_mode_s(tuner->tc_s, NULL, &pins);
+		status = pt3_tc_set_ts_pins_mode_s(tuner->tc_s, &pins);
 		if (status)
 			PT3_PRINTK(1, KERN_INFO, "fail set ts pins mode s [%d] status=0x%x\n", i, status);
 	}
 	for (i = 0; i < MAX_TUNER; i++) {
 		tuner = &pt3->tuner[i];
-		status = pt3_tc_set_ts_pins_mode_t(tuner->tc_t, NULL, &pins);
+		status = pt3_tc_set_ts_pins_mode_t(tuner->tc_t, &pins);
 		if (status)
 			PT3_PRINTK(1, KERN_INFO, "fail set ts pins mode t [%d] status=0x%x\n", i, status);
 	}
