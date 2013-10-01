@@ -56,7 +56,6 @@
  #define __devexit_p
 #endif
 
-#include <linux/kthread.h>
 #include <linux/dma-mapping.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
@@ -405,14 +404,12 @@ static STATUS tuner_power_on(pt3_board *pt3, PT3_BUS *bus)
 
 	for (i = 0; i < MAX_TUNER; i++) {
 		tuner = &pt3->tuner[i];
-		status = pt3_tc_set_ts_pins_mode_s(tuner->tc_s, &pins);
-		if (status)
+		if ((status = pt3_tc_set_ts_pins_mode_s(tuner->tc_s, &pins)))
 			PT3_PRINTK(1, KERN_INFO, "fail set ts pins mode s [%d] status=0x%x\n", i, status);
 	}
 	for (i = 0; i < MAX_TUNER; i++) {
 		tuner = &pt3->tuner[i];
-		status = pt3_tc_set_ts_pins_mode_t(tuner->tc_t, &pins);
-		if (status)
+		if ((status = pt3_tc_set_ts_pins_mode_t(tuner->tc_t, &pins)))
 			PT3_PRINTK(1, KERN_INFO, "fail set ts pins mode t [%d] status=0x%x\n", i, status);
 	}
 
@@ -422,8 +419,7 @@ static STATUS tuner_power_on(pt3_board *pt3, PT3_BUS *bus)
 		for (j = 0; j < 10; j++) {
 			if (j != 0)
 				PT3_PRINTK(0, KERN_INFO, "retry init_tuner\n");
-			status = init_tuner(pt3->i2c, &pt3->tuner[i]);
-			if (!status)
+			if (!(status = init_tuner(pt3->i2c, &pt3->tuner[i])))
 				break;
 			schedule_timeout_interruptible(msecs_to_jiffies(1));
 		}
@@ -453,15 +449,14 @@ last:
 	return status;
 }
 
-static STATUS
-init_all_tuner(pt3_board *pt3)
+static STATUS init_all_tuner(pt3_board *pt3)
 {
 	STATUS status;
 	int i, j, channel;
 	PT3_I2C *i2c = pt3->i2c;
 	PT3_BUS *bus = create_pt3_bus();
 
-	if (bus == NULL)
+	if (!bus)
 		return STATUS_OUT_OF_MEMORY_ERROR;
 
 	pt3_bus_end(bus);
@@ -484,6 +479,9 @@ init_all_tuner(pt3_board *pt3)
 				channel = 0;
 			else
 				channel = (i == 0) ? 70 : 71;
+#if 0
+PT3_PRINTK(0, KERN_DEBUG, "%d %d %s initch=%d\n", j, i, j==PT3_ISDB_S?"S":"T", channel);
+#endif
 			if ((status = set_tuner_sleep(j, &pt3->tuner[i], 0)))
 				goto last;
 			if ((status = set_frequency(j, &pt3->tuner[i], channel, 0)))
@@ -506,21 +504,17 @@ get_cn_agc(pt3_adapter *channel, __u32 *cn, __u32 *curr_agc, __u32 *max_agc)
 
 	switch (channel->type) {
 	case PT3_ISDB_S:
-		status = pt3_tc_read_cn_s(tuner->tc_s, NULL, cn);
-		if (status)
+		if ((status = pt3_tc_read_cn_s(tuner->tc_s, NULL, cn)))
 			return status;
-		status = pt3_tc_read_agc_s(tuner->tc_s, NULL, &byte_agc);
-		if (status)
+		if ((status = pt3_tc_read_agc_s(tuner->tc_s, NULL, &byte_agc)))
 			return status;
 		*curr_agc = byte_agc;
 		*max_agc = 127;
 		break;
 	case PT3_ISDB_T:
-		status = pt3_tc_read_cndat_t(tuner->tc_t, NULL, cn);
-		if (status)
+		if ((status = pt3_tc_read_cndat_t(tuner->tc_t, NULL, cn)))
 			return status;
-		status = pt3_tc_read_ifagc_dt(tuner->tc_t, NULL, &byte_agc);
-		if (status)
+		if ((status = pt3_tc_read_ifagc_dt(tuner->tc_t, NULL, &byte_agc)))
 			return status;
 		*curr_agc = byte_agc;
 		*max_agc = 255;
@@ -650,7 +644,6 @@ pt3_open(struct inode *inode, struct file *file)
 			mutex_unlock(&device[lp]->lock);
 		}
 	}
-
 	return -EIO;
 }
 
@@ -670,34 +663,24 @@ pt3_release(struct inode *inode, struct file *file)
 				pt3_dma_get_ts_error_packet_count(channel->dma));
 	set_tuner_sleep(channel->type, channel->tuner, 1);
 	schedule_timeout_interruptible(msecs_to_jiffies(50));
-
 	return 0;
 }
 
 static int dma_look_ready[PT3_NR_ADAPS] = {1, 1, 1, 1};
-static ssize_t
-pt3_read(struct file *file, char __user *buf, size_t cnt, loff_t * ppos)
+static ssize_t pt3_read(struct file *file, char __user *buf, size_t cnt, loff_t * ppos)
 {
-	size_t rcnt;
-	pt3_adapter *channel;
-
-	channel = file->private_data;
-
-	rcnt = pt3_dma_copy(channel->dma, buf, cnt, ppos,
-						dma_look_ready[channel->dma->real_index]);
+	pt3_adapter *channel = file->private_data;
+	size_t rcnt = pt3_dma_copy(channel->dma, buf, cnt, ppos, dma_look_ready[channel->dma->real_index]);
 	if (rcnt < 0) {
 		PT3_PRINTK(1, KERN_INFO, "fail copy_to_user.\n");
 		return -EFAULT;
 	}
-
 	return rcnt;
 }
 
-static int
-count_used_bs_tuners(pt3_board *device)
+static int count_used_bs_tuners(pt3_board *device)
 {
-	int count, i;
-	count = 0;
+	int i, count = 0;
 
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
 		if (device && device->adapter[i] &&
@@ -705,25 +688,21 @@ count_used_bs_tuners(pt3_board *device)
 			device->adapter[i]->valid)
 			count++;
 	}
-
 	PT3_PRINTK(1, KERN_INFO, "used bs tuners on %p = %d\n", device, count);
-
 	return count;
 }
 
 static long
 pt3_do_ioctl(struct file  *file, unsigned int cmd, unsigned long arg0)
 {
-	pt3_adapter *channel;
 	FREQUENCY freq;
 	int status, signal, curr_agc, max_agc, lnb_eff, lnb_usr;
 	unsigned int count;
 	unsigned long dummy;
 	char *voltage[] = {"0V", "11V", "15V"};
-	void *arg;
 
-	channel = file->private_data;
-	arg = (void *)arg0;
+	pt3_adapter *channel = file->private_data;
+	void *arg = (void *)arg0;
 
 	switch (cmd) {
 	case SET_CHANNEL:
@@ -807,7 +786,6 @@ pt3_unlocked_ioctl(struct file  *file, unsigned int cmd, unsigned long arg0)
 #else
 	lock_kernel();
 #endif
-
 	ret = pt3_do_ioctl(file, cmd, arg0);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)
@@ -815,7 +793,6 @@ pt3_unlocked_ioctl(struct file  *file, unsigned int cmd, unsigned long arg0)
 #else
 	unlock_kernel();
 #endif
-
 	return ret;
 }
 
@@ -839,12 +816,12 @@ static const struct file_operations pt3_fops = {
 	.open		=	pt3_open,
 	.release	=	pt3_release,
 	.read		=	pt3_read,
-	.llseek	=	no_llseek,
+	.llseek		=	no_llseek,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
 	.ioctl		=	pt3_ioctl,
 #else
 	.unlocked_ioctl	=	pt3_unlocked_ioctl,
-	.compat_ioctl		=	pt3_compat_ioctl,
+	.compat_ioctl	=	pt3_compat_ioctl,
 #endif
 };
 
@@ -921,7 +898,6 @@ pt3_pci_probe (struct pci_dev *pdev, const struct pci_device_id *ent)
 	bars = pci_select_bars(pdev, IORESOURCE_MEM);
 	if ((rc = pci_enable_device(pdev)))
 		return rc;
-
 	if ((rc = pci_request_selected_regions(pdev, bars, DRV_NAME)))
 		goto out_err_pci;
 
@@ -979,9 +955,15 @@ pt3_pci_probe (struct pci_dev *pdev, const struct pci_device_id *ent)
 		tuner = &pt3->tuner[lp];
 		tuner->tuner_no = lp;
 		tuner->tc_s = create_pt3_tc(pt3->i2c, pt3_tc_address(0, PT3_ISDB_S, lp), pt3_qm_address(lp));
+#if 0
+PT3_PRINTK(0, KERN_DEBUG, "0 %d S a_tc 0x%x a_tuner 0x%x\n", lp, pt3_tc_address(0, PT3_ISDB_S, lp), pt3_qm_address(lp));
+#endif
 		tuner->qm   = create_pt3_qm(pt3->i2c, tuner->tc_s);
 		tuner->tc_t = create_pt3_tc(pt3->i2c, pt3_tc_address(0, PT3_ISDB_T, lp), pt3_mx_address(lp));
 		tuner->mx   = create_pt3_mx(pt3->i2c, tuner->tc_t);
+#if 0
+PT3_PRINTK(0, KERN_DEBUG, "1 %d T a_tc 0x%x a_tuner 0x%x\n", lp, pt3_tc_address(0, PT3_ISDB_T, lp), pt3_mx_address(lp));
+#endif
 	}
 	PT3_PRINTK(7, KERN_DEBUG, "Allocate tuners.\n");
 
@@ -1008,36 +990,26 @@ pt3_pci_probe (struct pci_dev *pdev, const struct pci_device_id *ent)
 	for (lp = 0; lp < PT3_NR_ADAPS; lp++) {
 		cdev_init(&pt3->cdev[lp], &pt3_fops);
 		pt3->cdev[lp].owner = THIS_MODULE;
-		rc = cdev_add(&pt3->cdev[lp],
-			MKDEV(MAJOR(pt3->dev), (MINOR(pt3->dev) + lp)), 1);
-		if (rc < 0) {
+		if ((rc = cdev_add(&pt3->cdev[lp], MKDEV(MAJOR(pt3->dev), (MINOR(pt3->dev) + lp)), 1)) < 0)
 			PT3_PRINTK(0, KERN_ERR, "fail cdev_add.\n");
-		}
-
-		channel = kzalloc(sizeof(pt3_adapter), GFP_KERNEL);
-		if (channel == NULL) {
+		if (!(channel = kzalloc(sizeof(pt3_adapter), GFP_KERNEL))) {
 			PT3_PRINTK(0, KERN_ERR, "out of memory!\n");
 			goto out_err_dma;
 		}
-
-		channel->dma = create_pt3_dma(pdev, pt3->i2c, real_adapter[lp]);
-		if (channel->dma == NULL) {
+		if (!(channel->dma = create_pt3_dma(pdev, pt3->i2c, real_adapter[lp]))) {
 			PT3_PRINTK(0, KERN_ERR, "fail create dma.\n");
 			kfree(channel);
 			goto out_err_dma;
 		}
-
 		mutex_init(&channel->lock);
 		channel->minor = MINOR(pt3->dev) + lp;
 		channel->tuner = &pt3->tuner[real_adapter[lp] & 1];
 		channel->type  = adapter_type[lp];
 		channel->pt3   = pt3;
 		channel->i2c   = pt3->i2c;
-
 		pt3->adapter[lp] = channel;
 
-		PT3_PRINTK(0, KERN_INFO, "card_number=%d channel=%d\n",
-					pt3->card_number, real_adapter[lp]);
+		PT3_PRINTK(0, KERN_INFO, "card_number=%d channel=%d\n", pt3->card_number, real_adapter[lp]);
 		device_create(pt3video_class,
 				NULL,
 				MKDEV(MAJOR(pt3->dev), (MINOR(pt3->dev) + lp)),
@@ -1049,7 +1021,6 @@ pt3_pci_probe (struct pci_dev *pdev, const struct pci_device_id *ent)
 				(channel->type == PT3_ISDB_S) ? 's': 't',
 				MINOR(pt3->dev) + (lp&1) + (pt3->card_number*PT3_NR_ADAPS>>1));
 	}
-
 	pci_set_drvdata(pdev, pt3);
 	return 0;
 
@@ -1102,11 +1073,11 @@ pt3_pci_resume (struct pci_dev *pdev)
 static struct pci_driver pt3_driver = {
 	.name		= DRV_NAME,
 	.probe		= pt3_pci_probe,
-	.remove	= __devexit_p(pt3_pci_remove),
+	.remove		= __devexit_p(pt3_pci_remove),
 	.id_table	= pt3_pci_tbl,
 #ifdef CONFIG_PM
 	.suspend	= pt3_pci_suspend,
-	.resume	= pt3_pci_resume,
+	.resume		= pt3_pci_resume,
 #endif /* CONFIG_PM */
 };
 

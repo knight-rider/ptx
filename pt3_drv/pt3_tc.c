@@ -345,8 +345,7 @@ write_imsrst(PT3_TC *tc, PT3_BUS *bus)
 	return pt3_tc_write(tc, bus, 0x01, &buf, 1);
 }
 
-STATUS
-pt3_tc_init_t(PT3_TC *tc, PT3_BUS *bus)
+STATUS pt3_tc_init_t(PT3_TC *tc, PT3_BUS *bus)
 {
 	__u8 buf = 0x10;
 	STATUS status = write_imsrst(tc, bus);

@@ -223,7 +223,7 @@ pt3_dma_set_test_mode(PT3_DMA *dma, int test, __u16 init, int not, int reset)
 	base = get_base_addr(dma);
 	data = (reset ? 1: 0) << 18 | (not ? 1 : 0) << 17 | (test ? 1 : 0) << 16 | init;
 
-	PT3_PRINTK(7, KERN_DEBUG, "set_test_mode base=%p data=0x%04d\n",
+	PT3_PRINTK(7, KERN_DEBUG, "set_test_mode base=%p data=0x%04x\n",
 			base, data);
 
 	writel(data, base + 0x0c);
