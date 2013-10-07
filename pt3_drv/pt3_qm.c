@@ -92,7 +92,7 @@ qm_read(PT3_QM *qm, PT3_BUS *bus, __u8 addr, __u8 *data)
 		status = pt3_tc_read_tuner(qm->tc, bus, addr, data, 1);
 #if 0
 		if (!bus)
-			PT3_PRINTK(7, KERN_DEBUG "qm_read addr=0x%02x data=0x%02x\n", addr, *data);
+			PT3_PRINTK(7, KERN_DEBUG, "qm_read addr=0x%02x data=0x%02x\n", addr, *data);
 #endif
 	} else 
 		status = STATUS_OK;
@@ -505,8 +505,8 @@ pt3_qm_set_frequency(PT3_QM *qm, __u32 channel, __s32 offset)
 	else
 		freq_khz += 500;
 	qm->param.channel_freq = freq_khz;
-	//PT3_PRINTK(7, KERN_DEBUG "frequency %d Khz\n", freq_khz);
 
+PT3_PRINTK(7, KERN_DEBUG, "ch %d slot %d frequency %d Khz\n", channel, offset, freq_khz);
 
 	if ((status = qm_local_lpf_tuning(qm, NULL, 1, channel)))
 		return status;

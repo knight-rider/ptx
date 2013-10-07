@@ -43,13 +43,6 @@ typedef struct _TS_PINS_MODE {
 	int valid;
 } PT3_TS_PINS_MODE;
 
-typedef struct _TS_PINS_LEVEL {
-	int clock;
-	int data;
-	int byte;
-	int valid;
-} PT3_TS_PINS_LEVEL;
-
 enum LAYER_INDEX {
 	LAYER_INDEX_L = 0,
 	LAYER_INDEX_H,

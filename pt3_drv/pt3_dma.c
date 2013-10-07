@@ -96,9 +96,9 @@ pt3_dma_build_page_descriptor(PT3_DMA *dma, int loop)
 		PT3_PRINTK(1, KERN_ERR, "dma build page descriptor needs DMA\n");
 		return;
 	}
-#if 0
-	PT3_PRINTK(7, KERN_DEBUG, "build page descriptor ts_count=%d ts_size=0x%x desc_count=%d desc_size=0x%x\n",
-			dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
+#if 1
+PT3_PRINTK(7, KERN_DEBUG, "build page descriptor ts_count=%d ts_size=%d desc_count=%d desc_size=%d\n",
+	dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
 #endif
 
 	desc_info_pos = ts_info_pos = 0;
@@ -248,7 +248,7 @@ pt3_dma_set_enabled(PT3_DMA *dma, int enabled)
 		writel(BIT_SHIFT_MASK(start_addr, 32, 32), base + 0x4);
 		PT3_PRINTK(7, KERN_DEBUG, "set descriptor address low %llx\n",
 				BIT_SHIFT_MASK(start_addr,  0, 32));
-		PT3_PRINTK(7, KERN_DEBUG, "set descriptor address heigh %llx\n",
+		PT3_PRINTK(7, KERN_DEBUG, "set descriptor address high %llx\n",
 				BIT_SHIFT_MASK(start_addr, 32, 32));
 		writel( 1 << 0, base + 0x08);
 	} else {
@@ -275,8 +275,8 @@ pt3_dma_copy(PT3_DMA *dma, char __user *buf, size_t size, loff_t *ppos, int look
 
 	mutex_lock(&dma->lock);
 
-	PT3_PRINTK(7, KERN_DEBUG, "dma_copy ts_pos=0x%x data_pos=0x%x\n",
-				dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos);
+PT3_PRINTK(7, KERN_DEBUG, "dma_copy ts_pos=0x%x data_pos=0x%x size=%d ppos=%d\n",
+	   dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos, (int)size, (int)(*ppos));
 
 	remain = size;
 	for (;;) {
