@@ -44,7 +44,7 @@ static int lnb = 2;	// LNB OFF:0 +11V:1 +15V:2
 module_param(lnb, int, 0);
 MODULE_PARM_DESC(lnb, "LNB level (0:OFF 1:+11V 2:+15V)");
 
-int debug = 7;		// 1 normal messages, 0 quiet .. 7 verbose
+int debug = 0;		// 1 normal messages, 0 quiet .. 7 verbose
 module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "debug level (0-7)");
 
