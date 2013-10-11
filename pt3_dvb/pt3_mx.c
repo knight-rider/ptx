@@ -274,6 +274,7 @@ int pt3_mx_set_frequency(PT3_ADAPTER *adap, __u32 channel, __s32 offset)
 	if ((ret = pt3_tc_set_agc_t(adap, PT3_TC_AGC_MANUAL)))
 		return ret;
 	pt3_mx_get_channel_frequency(adap, channel, &catv, &number, &freq);
+ 	PT3_PRINTK(KERN_DEBUG, "#%d ch%d%s no%d %dHz\n", adap->idx, channel, catv ? " CATV" : "", number, freq);
 	//real_freq = (7 * freq + 1 + offset) * 1000000.0/7.0;
 	real_freq = REAL_TABLE[channel];
 

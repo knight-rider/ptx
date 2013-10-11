@@ -67,29 +67,19 @@ static int pt3_update_lnb(PT3_BOARD *pt3)
 	return 0;
 }
 
-int pt3_filter(PT3_ADAPTER *adap)
-{
-	loff_t ppos = 0;
-#define MAX_READ_SIZE (188*87) // =16356 splitterが188アライメントを期待しているのでこの数字とする
-
-	size_t ret = pt3_dma_copy(adap->dma, &adap->demux, MAX_READ_SIZE, &ppos, adap->dma->look_ready);
-	if (ret < 0) {
-		PT3_PRINTK(KERN_INFO, "#%d fail dma_copy\n", adap->idx);
-		return -EFAULT;
-	}
-	return 0;
-}
-
 int pt3_thread(void *data)
 {
+	size_t ret;
 	PT3_ADAPTER *adap = data;
-	set_freezable();
+	loff_t ppos = 0;
 
+	set_freezable();
 	while (!kthread_should_stop()) {
 		try_to_freeze();
-		if (pt3_filter(adap)) {
+		while ((ret = pt3_dma_copy(adap->dma, &adap->demux, MAX_READ_SIZE, &ppos, adap->dma->look_ready)) > 0);
+		if (ret < 0) {
+			PT3_PRINTK(KERN_INFO, "#%d fail dma_copy\n", adap->idx);
 			PT3_WAIT_MS_INT(1);
-			continue;
 		}
 	}
 	return 0;
@@ -337,10 +327,7 @@ static void pt3_cleanup_adapters(PT3_BOARD *pt3)
 		if (adap->kthread) kthread_stop(adap->kthread);
 		if (adap->fe) dvb_unregister_frontend(adap->fe);
 		if (!adap->sleep) pt3_set_tuner_sleep(adap, true);
-		if (adap->qm) {
-			vfree(adap->qm);
-			adap->qm = NULL;
-		}
+		if (adap->qm) vfree(adap->qm);
 		if (adap->dma) {
 			if (adap->dma->enabled) pt3_dma_set_enabled(adap->dma, false);
 			pt3_dma_free(adap->dma);

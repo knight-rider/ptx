@@ -1,6 +1,9 @@
+obj-$(CONFIG_PT3_DVB) += pt3_dvb.o
+ccflags-y += -Idrivers/media/dvb-core/ -Idrivers/media/dvb-frontends/
+
 TARGET := pt3_dvb.ko
 VERBOSITY = 0
-EXTRA_CFLAGS += -Wformat=2 -Wall -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends
+EXTRA_CFLAGS += -Wformat=2 -Wall -Werror -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends
 KVER ?= `uname -r`
 
 KBUILD = /lib/modules/$(KVER)/build

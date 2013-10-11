@@ -120,6 +120,7 @@ static int pt3s_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 	    freq = state->fe.dtv_property_cache.frequency,
 	    tsid = state->fe.dtv_property_cache.stream_id,
 	    ch = pt3s_get_channel(freq);
+ 	    ch = (freq < 1024) ? freq : pt3s_get_channel(freq); // consider as freqno if freq is low
 
 	if (re_tune) state->tune_state = PT3S_SET_FREQUENCY;
 
@@ -141,8 +142,7 @@ static int pt3s_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 
 	case PT3S_SET_MODULATION:
 		for (i = 0; i < 1000; i++) {
-			if (!(ret = pt3_tc_read_tmcc_s(adap, NULL, tmcc)))
-				break;
+			if (!(ret = pt3_tc_read_tmcc_s(adap, NULL, tmcc))) break;
 			PT3_WAIT_MS_INT(1);
 		}
 		if (ret) {
@@ -165,6 +165,7 @@ static int pt3s_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 			PT3_PRINTK(KERN_DEBUG, "tsid %x i %d tmcc->id %x\n", tsid, i, tmcc->id[i]);
 			if (tmcc->id[i] == tsid) break;
 		}
+ 		if (tsid < sizeof(tmcc->id)/sizeof(tmcc->id[0])) i = tsid; // consider as slot#
 		if (i == sizeof(tmcc->id)/sizeof(tmcc->id[0])) {
 			PT3_PRINTK(KERN_ALERT, "#%d i%d tsid 0x%x not found\n", adap->idx, i, tsid);
 			return -EINVAL;
@@ -214,7 +215,7 @@ static DVB_FRONTEND_OPS pt3s_ops = {
 	.delsys = { SYS_ISDBS },
 	.info = {
 		.name = "PT3 ISDB-S",
-		.frequency_min = 950000,
+		.frequency_min = 1,//950000,
 		.frequency_max = 2150000,
 		.frequency_stepsize = 1000,
 		.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO | FE_CAN_QAM_AUTO | FE_CAN_MULTISTREAM |

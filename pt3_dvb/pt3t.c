@@ -108,6 +108,24 @@ static int pt3t_read_status(DVB_FRONTEND *fe, fe_status_t *status)
 	BUG();
 }
 
+#define NHK (REAL_TABLE[77])
+int pt3t_freq(int freq)
+{
+	if (freq > 255) return freq;			// real_freq
+	if (freq > 127) return REAL_TABLE[freq - 128];	// freqno (io_no)
+	if (freq > 63) {				// CATV
+		freq -= 64;
+		if (freq > 22) return REAL_TABLE[freq - 1];	// C23-C62
+		if (freq > 12) return REAL_TABLE[freq - 10];	// C13-C22
+		return NHK;
+	}
+	if (freq > 62) return NHK;
+	if (freq > 12) return REAL_TABLE[freq + 50];	// 13-62
+	if (freq >  3) return REAL_TABLE[freq +  9];	//  4-12
+	if (freq)      return REAL_TABLE[freq -  1];	//  1-3
+	return NHK;
+}
+
 static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, unsigned int *delay, fe_status_t *status)
 {
 	TMCC_T tmcc_t;
@@ -126,7 +144,7 @@ static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 		//pt3_set_frequency(state->adap,77,0); // NHK
 		if ((ret = pt3_tc_set_agc_t(state->adap, PT3_TC_AGC_MANUAL)))
 			return ret;
-		pt3_mx_tuner_rftune(state->adap, NULL, state->fe.dtv_property_cache.frequency);
+		pt3_mx_tuner_rftune(state->adap, NULL, pt3t_freq(state->fe.dtv_property_cache.frequency));
 		state->tune_state = PT3T_CHECK_FREQUENCY;
 		*delay = 0;
 		*status = 0;
@@ -185,7 +203,7 @@ static DVB_FRONTEND_OPS pt3t_ops = {
 	.delsys = { SYS_ISDBT },
 	.info = {
 		.name = "PT3 ISDB-T",
-		.frequency_min = 90000000,
+		.frequency_min = 1,//90000000,
 		.frequency_max = 770000000,
 		.frequency_stepsize = 142857,
 		.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO | FE_CAN_QAM_AUTO |
