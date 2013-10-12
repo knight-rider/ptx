@@ -51,15 +51,12 @@ static int pt3t_init(DVB_FRONTEND *fe)
 {
 	PT3T_STATE *state = fe->demodulator_priv;
 	state->tune_state = PT3T_IDLE;
-//	return pt3_set_tuner_sleep(state->adap, false);
 	return pt3_mx_set_sleep(state->adap, false);
 }
 
 static int pt3t_sleep(DVB_FRONTEND *fe)
 {
 	PT3T_STATE *state = fe->demodulator_priv;
-//	int ret = pt3_set_frequency(state->adap, state->adap->init_ch, 0);
-//	return (ret < 0) ? ret : pt3_set_tuner_sleep(state->adap, true);
 	return pt3_mx_set_sleep(state->adap, true);
 }
 
@@ -141,7 +138,6 @@ static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 		return 0;
 
 	case PT3T_SET_FREQUENCY:
-		//pt3_set_frequency(state->adap,77,0); // NHK
 		if ((ret = pt3_tc_set_agc_t(state->adap, PT3_TC_AGC_MANUAL)))
 			return ret;
 		pt3_mx_tuner_rftune(state->adap, NULL, pt3t_freq(state->fe.dtv_property_cache.frequency));
@@ -181,8 +177,6 @@ static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 				*delay = 3 * HZ;
 				return 0;				
 		}
-		PT3_WAIT_MS_INT(50);					// wait for fill buffer
-		pt3_dma_set_test_mode(state->adap->dma, RESET, 0);	// reset_error_count
 		state->tune_state = PT3T_TRACK;
 		// fall through
 

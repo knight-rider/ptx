@@ -13,7 +13,7 @@
 #define ID_DEV_PT3	0x4c15
 
 #define PT3_NR_ADAPS 4
-#define MAX_READ_SIZE (188*87) // =16356 splitterが188アライメントを期待しているのでこの数字とする
+#define MAX_READ_SIZE (188*87*1024) // =16356*1024 splitterが188アライメントを期待しているのでこの数字とする
 
 #define PT3_SHIFT_MASK(val, shift, mask) (((val) >> (shift)) & (((__u64)1<<(mask))-1))
 
@@ -49,7 +49,7 @@ int debug = 7;		// 1 normal messages, 0 quiet .. 7 verbose
 module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "debug level (0-7)");
 
-MODULE_AUTHOR("Bud R <knightrider @ are.ma>");
+MODULE_AUTHOR("Budi Rachmanto <knightrider @ are.ma>");
 MODULE_DESCRIPTION("Earthsoft PT3 DVB Driver");
 MODULE_LICENSE("GPL");
 
@@ -117,15 +117,13 @@ typedef struct {
 	__u32 rate[LAYER_COUNT_T];
 	__u32 interleave[LAYER_COUNT_T];
 	__u32 segment[LAYER_COUNT_T];
-	__u32 phase;
-	__u32 reserved;
 } TMCC_T;
 
 typedef struct _PT3_ADAPTER PT3_ADAPTER;
 
 typedef struct {
 	PT3_ADAPTER *adap;
-	bool enabled, look_ready;
+	bool enabled;
 	__u32 ts_pos, ts_count, desc_count;
 	PT3_DMA_PAGE *ts_info, *desc_info;
 	MUTEX lock;

@@ -41,7 +41,6 @@ int pt3_tc_init(PT3_ADAPTER *adap)
 	__u8 buf = 0x10;
 
 	PT3_PRINTK(KERN_INFO, "#%d %s tuner=0x%x tc=0x%x\n", adap->idx, adap->str, adap->addr_tuner, adap->addr_tc);
-
 	if (adap->type == SYS_ISDBS) {
 		int ret = pt3_tc_write_pskmsrst(adap);
 		return ret ? ret : pt3_tc_write(adap, NULL, 0x1e, &buf, 1);
@@ -53,10 +52,10 @@ int pt3_tc_init(PT3_ADAPTER *adap)
 
 int pt3_tc_set_powers(PT3_ADAPTER *adap, PT3_BUS *bus, bool tuner, bool amp)
 {
-	__u8 tuner_power = tuner ? 0x03 : 0x02;
-	__u8 amp_power = amp ? 0x03 : 0x02;
-	__u8 data = (tuner_power << 6) | (0x01 << 4) | (amp_power << 2) | 0x01 << 0;
-PT3_PRINTK(KERN_DEBUG, "#%d tuner %s amp %s\n", adap->idx, tuner ? "ON" : "OFF", amp ? "ON" : "OFF");
+	__u8	tuner_power = tuner ? 0x03 : 0x02,
+		amp_power = amp ? 0x03 : 0x02,
+		data = (tuner_power << 6) | (0x01 << 4) | (amp_power << 2) | 0x01 << 0;
+	PT3_PRINTK(KERN_DEBUG, "#%d tuner %s amp %s\n", adap->idx, tuner ? "ON" : "OFF", amp ? "ON" : "OFF");
 	return pt3_tc_write(adap, bus, 0x1e, &data, 1);
 }
 
@@ -69,7 +68,6 @@ int pt3_tc_set_ts_pins_mode(PT3_ADAPTER *adap, PT3_TS_PINS_MODE *mode)
 	if (clock_data)	clock_data++;
 	if (byte)	byte++;
 	if (valid)	valid++;
-
 	if (adap->type == SYS_ISDBS) {
 		__u8 data[2];
 		int ret;

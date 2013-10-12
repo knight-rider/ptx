@@ -160,7 +160,6 @@ PT3_DMA *pt3_dma_create(PT3_ADAPTER *adap)
 	}
 	dma->adap = adap;
 	dma->enabled = false;
-	dma->look_ready = true;
 	mutex_init(&dma->lock);
 
 	dma->ts_count = PT3_DMA_BLOCK_COUNT;
@@ -303,7 +302,7 @@ bool pt3_dma_ready(PT3_DMA *dma)
 	return false;
 }
 
-ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, size_t size, loff_t *ppos, bool look_ready)
+ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, size_t size, loff_t *ppos)
 {
 	bool ready;
 	PT3_DMA_PAGE *page;
@@ -311,26 +310,24 @@ ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, size_t size, loff_t *ppos, 
 	__u32 i, prev;
 
 	mutex_lock(&dma->lock);
-	PT3_PRINTK(KERN_DEBUG, "#%d dma_copy ts_pos=0x%x data_pos=0x%x size=%d ppos=%d\n",
+	PT3_PRINTK(KERN_DEBUG, "#%d dma_copy ts_pos=0x%x data_pos=0x%x size=%d ppos=0x%x\n",
 		   dma->adap->idx, dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos, (int)size, (int)(*ppos));
 	for (;;) {
-		if (likely(look_ready)) {
-			for (i = 0; i < 20; i++) {
-				if ((ready = pt3_dma_ready(dma)))
-					break;
-				PT3_WAIT_MS_INT(30);
-			}
-			if (!ready) {
-				PT3_PRINTK(KERN_DEBUG, "#%d dma_copy NOT READY\n", dma->adap->idx);
-				goto last;
-			}
-			prev = dma->ts_pos - 1;
-			if (prev < 0 || dma->ts_count <= prev)
-				prev = dma->ts_count - 1;
-			if (dma->ts_info[prev].data[0] != PT3_DMA_NOT_SYNC_BYTE)
-				PT3_PRINTK(KERN_INFO, "#%d DMA buffer overflow. prev=%d data=0x%x\n",
-						dma->adap->idx, prev, dma->ts_info[prev].data[0]);
+		for (i = 0; i < 20; i++) {
+			if ((ready = pt3_dma_ready(dma)))
+				break;
+			PT3_WAIT_MS_INT(30);
 		}
+		if (!ready) {
+			PT3_PRINTK(KERN_DEBUG, "#%d dma_copy NOT READY\n", dma->adap->idx);
+			goto last;
+		}
+		prev = dma->ts_pos - 1;
+		if (prev < 0 || dma->ts_count <= prev)
+			prev = dma->ts_count - 1;
+		if (dma->ts_info[prev].data[0] != PT3_DMA_NOT_SYNC_BYTE)
+			PT3_PRINTK(KERN_INFO, "#%d DMA buffer overflow. prev=%d data=0x%x\n",
+					dma->adap->idx, prev, dma->ts_info[prev].data[0]);
 		page = &dma->ts_info[dma->ts_pos];
 		for (;;) {
 			if ((page->size - page->data_pos) > remain) {

@@ -76,7 +76,7 @@ int pt3_thread(void *data)
 	set_freezable();
 	while (!kthread_should_stop()) {
 		try_to_freeze();
-		while ((ret = pt3_dma_copy(adap->dma, &adap->demux, MAX_READ_SIZE, &ppos, adap->dma->look_ready)) > 0);
+		while ((ret = pt3_dma_copy(adap->dma, &adap->demux, MAX_READ_SIZE, &ppos)) > 0);
 		if (ret < 0) {
 			PT3_PRINTK(KERN_INFO, "#%d fail dma_copy\n", adap->idx);
 			PT3_WAIT_MS_INT(1);
@@ -96,6 +96,7 @@ static int pt3_start_polling(PT3_ADAPTER *adap)
 			ret = PTR_ERR(adap->kthread);
 			adap->kthread = NULL;
 		} else {
+			pt3_dma_set_test_mode(adap->dma, RESET, 0);	// reset_error_count
 			pt3_dma_set_enabled(adap->dma, true);
 		}
 	}
@@ -108,6 +109,8 @@ static void pt3_stop_polling(PT3_ADAPTER *adap)
 	mutex_lock(&adap->lock);
 	if (adap->kthread) {
 		pt3_dma_set_enabled(adap->dma, false);
+		PT3_PRINTK(KERN_INFO, "#%d DMA ts_err packet cnt %d\n",
+			adap->idx, pt3_dma_get_ts_error_packet_count(adap->dma));
 		kthread_stop(adap->kthread);
 		adap->kthread = NULL;
 	}
@@ -138,7 +141,6 @@ static int pt3_stop_feed(DVB_DEMUX_FEED *feed)
 	if (!--adap->users) {
 		pt3_stop_polling(adap);
 		adap->in_use = false;
-		PT3_PRINTK(KERN_INFO, "%p error count %d\n", adap, pt3_dma_get_ts_error_packet_count(adap->dma));
 		PT3_WAIT_MS_INT(40);
 	}
 	return 0;
