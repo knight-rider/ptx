@@ -335,7 +335,7 @@ ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, size_t size, loff_t *ppos)
 			} else {
 				csize = (page->size - page->data_pos);
 			}
-			dvb_dmx_swfilter_raw(demux, &page->data[page->data_pos], csize); // is this the best???
+			dvb_dmx_swfilter(demux, &page->data[page->data_pos], csize); // is this OK???
 			*ppos += csize;
 			remain -= csize;
 			page->data_pos += csize;

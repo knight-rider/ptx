@@ -172,7 +172,7 @@ static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 			PT3_WAIT_MS_INT(2);
 		}
 		if (ret) {
-			PT3_PRINTK(KERN_ALERT, "#%d fail get_tmcc_t ret=0x%x\n", state->adap->idx, ret);
+			PT3_PRINTK(KERN_ALERT, "#%d fail get_tmcc_t ret=%d\n", state->adap->idx, ret);
 				state->tune_state = PT3T_ABORT;
 				*delay = 3 * HZ;
 				return 0;				

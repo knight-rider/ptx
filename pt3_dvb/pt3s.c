@@ -175,7 +175,7 @@ static int pt3s_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 
 	case PT3S_SET_TS_ID:
 		if ((ret = pt3_tc_write_id_s(adap, NULL, (__u16)tmcc->id[adap->offset]))) {
-			PT3_PRINTK(KERN_ALERT, "fail set_tmcc_s ret=0x%x\n", ret);
+			PT3_PRINTK(KERN_ALERT, "fail set_tmcc_s ret=%d\n", ret);
 			return ret;
 		}
 		state->tune_state = PT3S_CHECK_TS_ID;
@@ -185,7 +185,7 @@ static int pt3s_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 		for (i = 0; i < 1000; i++) {
 			u16 short_id;
 			if ((ret = pt3_tc_read_id_s(adap, NULL, &short_id))) {
-				PT3_PRINTK(KERN_ERR, "fail get_id_s ret=0x%x\n", ret);
+				PT3_PRINTK(KERN_ERR, "fail get_id_s ret=%d\n", ret);
 				return ret;
 			}
 			tsid = short_id;
