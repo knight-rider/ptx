@@ -302,16 +302,16 @@ bool pt3_dma_ready(PT3_DMA *dma)
 	return false;
 }
 
-ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, size_t size, loff_t *ppos)
+ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, loff_t *ppos)
 {
 	bool ready;
 	PT3_DMA_PAGE *page;
-	size_t csize, remain = size;
 	__u32 i, prev;
+	size_t csize, remain = dma->ts_info[dma->ts_pos].size;
 
 	mutex_lock(&dma->lock);
-	PT3_PRINTK(KERN_DEBUG, "#%d dma_copy ts_pos=0x%x data_pos=0x%x size=%d ppos=0x%x\n",
-		   dma->adap->idx, dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos, (int)size, (int)(*ppos));
+	PT3_PRINTK(KERN_DEBUG, "#%d dma_copy ts_pos=0x%x data_pos=0x%x ppos=0x%x\n",
+		   dma->adap->idx, dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos, (int)(*ppos));
 	for (;;) {
 		for (i = 0; i < 20; i++) {
 			if ((ready = pt3_dma_ready(dma)))
@@ -330,11 +330,8 @@ ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, size_t size, loff_t *ppos)
 					dma->adap->idx, prev, dma->ts_info[prev].data[0]);
 		page = &dma->ts_info[dma->ts_pos];
 		for (;;) {
-			if ((page->size - page->data_pos) > remain) {
-				csize = remain;
-			} else {
-				csize = (page->size - page->data_pos);
-			}
+			csize = (remain < (page->size - page->data_pos)) ?
+				remain : (page->size - page->data_pos);
 			dvb_dmx_swfilter(demux, &page->data[page->data_pos], csize); // is this OK???
 			*ppos += csize;
 			remain -= csize;
@@ -353,7 +350,7 @@ ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, size_t size, loff_t *ppos)
 	}
 last:
 	mutex_unlock(&dma->lock);
-	return size - remain;
+	return dma->ts_info[dma->ts_pos].size - remain;
 }
 
 __u32 pt3_dma_get_status(PT3_DMA *dma)

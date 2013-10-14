@@ -13,7 +13,6 @@
 #define ID_DEV_PT3	0x4c15
 
 #define PT3_NR_ADAPS 4
-#define MAX_READ_SIZE (188*87) // =16356 splitterが188アライメントを期待しているのでこの数字とする
 
 #define PT3_SHIFT_MASK(val, shift, mask) (((val) >> (shift)) & (((__u64)1<<(mask))-1))
 

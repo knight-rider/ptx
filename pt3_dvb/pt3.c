@@ -76,7 +76,7 @@ int pt3_thread(void *data)
 	set_freezable();
 	while (!kthread_should_stop()) {
 		try_to_freeze();
-		while ((ret = pt3_dma_copy(adap->dma, &adap->demux, MAX_READ_SIZE, &ppos)) > 0);
+		while ((ret = pt3_dma_copy(adap->dma, &adap->demux, &ppos)) > 0);
 		if (ret < 0) {
 			PT3_PRINTK(KERN_INFO, "#%d fail dma_copy\n", adap->idx);
 			PT3_WAIT_MS_INT(1);
@@ -128,7 +128,6 @@ static int pt3_start_feed(DVB_DEMUX_FEED *feed)
 		}
 		PT3_PRINTK(KERN_DEBUG, "#%d %s selected, DMA %s\n",
 			adap->idx, adap->str, pt3_dma_get_status(adap->dma) & 1 ? "ON" : "OFF");
-//		PT3_WAIT_MS_INT(100);
 		adap->in_use = true;
 		if ((ret = pt3_start_polling(adap))) return ret;
 	}
