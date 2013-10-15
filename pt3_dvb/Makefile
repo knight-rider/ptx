@@ -1,5 +1,5 @@
 obj-$(CONFIG_PT3_DVB) += pt3_dvb.o
-ccflags-y += -Idrivers/media/dvb-core/ -Idrivers/media/dvb-frontends/
+ccflags-y += -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends
 
 TARGET := pt3_dvb.ko
 VERBOSITY = 0
