@@ -1,0 +1,65 @@
+#!/bin/sh
+DVBEVREC=~/friio/linux/dvb_apps/scripts/dvbevrec.py
+
+#default param
+ADAPTER=0
+FRONTEND=0
+
+if [ $# -lt 3 ]; then
+    echo "Usage: $0
+	    <HH:MM> [<YYYY-mm-dd>] {-c <CHANNEL_NAME> | -s <SERVICE_ID>}...
+Other date formats: mmddYYYY mm/dd/YYYY dd.mm.YYYY" >&2
+    exit 1
+fi
+
+if [ ! -r $DVBEVREC ]; then
+    echo "Edit this script to set the proper DVBEVREC."
+    exit 1
+fi
+
+TIME=$1
+shift
+if [ x"${1:0:1}" != x- ]; then
+    # date specified
+    TIME="$TIME $1"
+    shift
+    tm=`date +%s --date "$TIME" 2> /dev/null`
+    if [ x"$tm" == x ]; then
+        echo "Invalid time specified."
+        exit 1
+    fi
+
+    now=`date +%s`
+    if [ $(($tm + 3600)) -lt $now ]; then
+        echo "The start time is already past too far."
+        exit 0
+    fi
+
+    if [ $(($tm - 60)) -lt $now ]; then
+        echo "The time is too near or already past. starting immediately..."
+        python $DVBEVREC $@ >/dev/null &
+        exit $?
+    fi
+fi
+
+args=("$@")
+i=0
+while [ $i -lt $# ]; do
+    case ${args[$i]} in
+    (-a|--adapter)    ADAPTER=${args[$(($i + 1))]} ;;
+    (--adapter=?*)   ADAPTER=${args[$i]#--channel=} ;;
+    (-f|--frontend)    FRONTEND=${args[$(($i + 1))]} ;;
+    (--frontend=?*)   FRONTEND=${args[$i]#--channel=} ;;
+    esac
+    i=$(($i + 1))
+done
+
+at $TIME - 1 minutes <<EOF
+tm=\`date +%s --date "$TIME JST" 2> /dev/null\`
+[ \$tm -lt \`date +%s\` ] && echo 'already past the time [${TIME}] to start recording.' && exit 1
+FE_FILE="/dev/dvb/adapter${ADAPTER}/frontend${FRONTEND}"
+flock --timeout=45 \$FE_FILE python "$DVBEVREC" $@ > /dev/null || {
+   ps xo pid=,cmd= | awk '\$2~/python\$/ && \$3~/'${DVBEVREC##*/}'\$/{print \$1}' | xargs -r kill &> /dev/null
+  flock --timeout=0 \$FE_FILE python "$DVBEVREC" $@
+} 
+EOF

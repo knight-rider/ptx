@@ -1,0 +1,143 @@
+配布の構成について
+ ./cmds/                各種ユーティリティコマンド 主にストリーム解析用
+ ./scripts/             各種ユーティリテイ スクリプト 主に録画用
+ ./readme-cmds.txt       ./cmds/* の説明
+ ./readme-scripts.txt     ./scripts/* の説明
+ ./README.txt これ
+
+ver0.97から0.98での
+主な更新情報
+ cmds/s2scan
+  - BS, CS110 がスキャンできなくなっていたのを修正
+ scripts/dvb_sched_ev2
+  - 間違ったチャンネル名を指定した場合の挙動を修正
+
+-----------------
+ver0.96から0.97での変更点
+ scripts/dvb_sched_ev2
+  - 延長待ち対応が無効になっていたのを修正
+ scripts/dvbevrec2.py
+  - 最大延長待ち時間を超えた等の理由により、
+    指定された番組が見つからない場合は報告するよう修正
+  - 最大延長待ち時間のデフォルトを変更
+
+-----------------
+ver0.95から0.96での変更点
+ cmds/s2scan
+  - 新BSデジタル放送に対応してスキャン範囲を拡大
+
+-----------------
+ver0.92から0.95での変更点
+patches/{mplayer, gstreamer}を別パッケージに分離
+patches/extensionsを削除(Yahoo TVのフォーマット変更のため使用不可)
+
+-----------------
+ver0.91から0.92での変更点
+ patches/mplayer
+  - 本家最近版(rev32954, ffmpegはcommit 4f84e728 Feb 16 2011)にrebase
+  - 本家での内部faadサポート廃止に伴い, faad向けパッチの廃止
+  - ワンセグ再生で 音声デコーダにffmpegを使用した場合の不具合を修正
+
+ patches/gstreamer
+  - tsファイル再生時のシーク機能追加
+  - dvbのコンポーネントdvbbasebinがplaybin2内で使用してもうまく動作するよう改修
+     -> totem dvb://NHK や gst-launch playbin2 uri=dvb://NHK が再生できるように
+  - AAC デュアルモノの選択機能と自動選択の追加
+  - AAC音声のS/PDIF出力に対応(experimental)
+
+-----------------
+ver0.9から0.91での変更点
+ patches/mplayer
+   - AAC音声(例:デジタルTV放送の音声)が,先頭付近のデータ内容により
+     再生できない場合がある不具合を修正.
+     音声コーデックに内部libfaad/内部ffmpegを使用する場合のみ有効.
+   - 最近のリビジョンrev32630への(一括)パッチに更新
+   - AAC音声のチャンネル数切り替わり対応は, 本家が別途(AC3向けで)対応したのでそれに移行
+
+ patches/gstreamer
+   - MPEG-TSからのAAC音声がぷつぷつ途切れて再生させるバグを修正
+   - mpegtsparse と mpegtsdemuxを組み合わせるとエラーになるバグを修正
+   - mpegtsdemuxのタイムスタンプ関係のバグ?を修正. videosinkでデータを捨てられてしまう症状に対処.
+   - gst-plugins-bad 0.10.20へのパッチに更新
+
+ scripts/dvb_sched[_ev2]
+   - I/Oの優先度を上げてみた (ioniceを使って). 効果未確認;)
+   - その他 小バグ修正
+
+-----------------
+ver0.81から0.9での変更点
+ scripts/dvb_sched_ev2
+    イベントの追跡,事前のEID検索,予約が時間どおり起動できなかった場合などの挙動を改良
+    予約重複の判定の厳密化(同じDVBデバイス(フロントエンド)を使用する場合のみ重複とする)
+    予約重複時の挙動設定の追加: 何もしないで新規予約が(異常)終了, 重複する他プロセスをkill,
+                          特定の重複するプロセスのみkill
+    イベントIDの事前検索を行わない旧版dvb_sched_evを廃止,...ev2へ統合(-n オプション)
+    出力ファイル名に空白が入っているとエラーになる問題を修正
+
+ scripts/dvb_sched
+    起動タイミングの判定・重複時の挙動などをdvb_sched_ev2と合わせて改良
+ scripts/dvbrec.py
+    起動時のオプションをdvbevrec2.pyと合わせるよう変更
+
+ cmds/dumpeid
+    -o オプションを追加し, より広い範囲の番組情報を検索: TSストリーム内に含まれている他局番組情報や
+    2日後...8日後までのより遠い将来の番組情報も検索できるようにした. 
+   (主にBS用, dvb_sched_ev2からの利用を想定)
+    
+
+
+ver0.8から0.81での変更点
+ patches/mplayer
+   NHK BS1等のように, 同じプログラム内に複数の映像・音声ストリームを含む場合に
+   デフォルトでメインのストリームを選ぶように改良
+
+ patches/gstreamer
+   DVBデバイスのフロントエンドが, DTV_DELIVERY_SYSTEMプロパティを設定してない場合に
+   チューニングに失敗する問題を修正
+
+
+-------------------
+ver.0.7 から 0.8での変更点
+機能追加・改良
+ patches/mplayer
+   アクセスできるDVBデバイス数の上限up(4->16)
+   DVBカード番号の指定を1スタートから0スタートに変更
+   チャンネル定義ファイルの解釈処理改良
+
+ patches/gstreamer
+   プログラム内での映像・音声ストリームの選択機能の追加
+   アダプタ指定付きURI dvb://<cardno>@<channel> のサポート
+
+ cmds/s2scan
+   スキャン時のLNB電源制御オプション追加
+   BSのスキャン範囲の拡大(1..15ch -> 1..23ch)
+
+バグfix
+ [patches/gstreamer]
+  PCSCがない/disabledにした環境でのビルドエラーfix
+  ISDB-Sのストリーム再生時に落ちるバグのfix
+
+
+-----------------
+ver.0.6 から 0.7での変更点
+機能追加・改良
+ mplayer音声切り替わり対応: 従来のlibfaad2への対応に加えてffmpeg/ffaacも対応.
+                            将来的に本家がlibfaad2を削除する開発方針に沿って.
+
+ 予約録画(dvbevrec...): 番組の移動(ex.臨時ニュースによる)やリレー(ex. 高校野球)
+                        への追従を*実験*実装. テスト不十分.
+
+
+------------------
+ver.0.5 から 0.6での変更点
+新機能
+ 予約録画(dvb_sched_ev2):  dvb_sched_evの追跡録画(延長/繰り下げ追従)を改良.
+                           事前にEITを調べてそのEIDで追跡するよう改良
+ EIT情報表示(dumpeid):  dvb_sched_ev2のヘルパーコマンド. 
+                        指定した時刻(または入力ストリームの先頭)で放送中の
+                        イベントのEID(+タイトル・内容概要)を表示
+ 
+patches/gstreamer
+ gstreamer-bad(-free) 0.10.28に対応してパッチをrebase,
+ 今まで機能毎に分けていたパッチを1つにまとめた
+ EIT発見時に報告されるgstreamerメッセージ内のcharcode変換エラーの修正

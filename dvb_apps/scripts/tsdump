@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/hexdump -e '"%08.8_ax: " 188/1 "%02x " "\n"' $*
