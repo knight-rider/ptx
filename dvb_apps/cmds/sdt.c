@@ -57,25 +57,25 @@ void set_service_desc(uint8_t *p, struct sdt *sdt)
 int doSDT(struct secbuf *sec, void *data)
 {
 	int ver, len;
-	int nw_desc_len, dlen;
+	int dlen;
 	uint16_t ts_id, orig_nw_id;
 	uint8_t *p;
 	struct sdt *sdt = data;
 
 	/* TODO: check CRC?, using crc32 module like dvb_net.c? */
-	if (sec->buf[0] != TID_SDT || sec->buf[1] & 0xf0 != 0xb0 ) {
+	if (sec->buf[0] != TID_SDT || (sec->buf[1] & 0xf0) != 0xb0 ) {
 		dprintf(" bad table header.\n");
 		return 2;
 	}
 
-	len = (sec->buf[1] & 0x0f) << 8 | sec->buf[2] + 3;
+	len = (sec->buf[1] & 0x0f) << 8 | (sec->buf[2] + 3);
 	ts_id = sec->buf[3] << 8 | sec->buf[4];
 	ver = (sec->buf[5] & 0x3e0) >> 1;
 	orig_nw_id = sec->buf[8] << 8 | sec->buf[9];
 
 	if (!(sec->buf[5]&0x01) || 
-	    sec->buf[6] &&
-	    (ts_id != sdt->ts_id || orig_nw_id != sdt->orig_nw_id)) {
+	    (sec->buf[6] &&
+	    (ts_id != sdt->ts_id || orig_nw_id != sdt->orig_nw_id))) {
 		dprintf(" bad section.\n");
 		return 2;
 	}

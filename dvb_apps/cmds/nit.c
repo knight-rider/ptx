@@ -101,7 +101,6 @@ void set_partial_recv(uint8_t *p, struct nit *nit)
 	uint8_t *q;
 	int i, idx;
 	uint16_t service_id;
-	uint8_t service_type;
 
 	q = p + 2;
 	dprintf("  partial_recv_list ");
@@ -122,25 +121,24 @@ void set_partial_recv(uint8_t *p, struct nit *nit)
 
 int doNIT(struct secbuf *sec, void *data)
 {
-	int ver, len, i;
+	int ver, i;
 	int nw_desc_len, ts_desc_len;
 	uint16_t nw_id;
 	uint8_t *p, *q;
 	struct nit *nit = data;
 
 	/* TODO: check CRC?, using crc32 module like dvb_net.c? */
-	if (sec->buf[0] != TID_NIT_SELF || sec->buf[1] & 0xf0 != 0xb0 ) {
+	if (sec->buf[0] != TID_NIT_SELF || (sec->buf[1] & 0xf0) != 0xb0 ) {
 		dprintf(" bad table header.\n");
 		return 2;
 	}
 
-	len = (sec->buf[1] & 0x0f) << 8 | sec->buf[2];
 	nw_id = sec->buf[3] << 8 | sec->buf[4];
 	ver = (sec->buf[5] & 0x3e0) >> 1;
 	nw_desc_len = (sec->buf[8]&0x0f)<< 8 | sec->buf[9];
 
-	if (!(sec->buf[5]&0x01) || sec->buf[6] && nw_desc_len
-	    || sec->buf[6] && nw_id != nit->nw_id) {
+	if (!(sec->buf[5]&0x01) || (sec->buf[6] && nw_desc_len)
+	    || (sec->buf[6] && (nw_id != nit->nw_id))) {
 		dprintf(" bad section.\n");
 		return 2;
 	}

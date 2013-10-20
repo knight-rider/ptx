@@ -96,7 +96,7 @@ int set_eith(struct eith **eitp, uint8_t *buf)
 	struct eith *eit = *eitp;
 
 	int ver = (buf[5] & 0x3e0) >> 1;
-	int len = (buf[1] & 0x0f) << 8 | buf[2] + 3;
+	int len = (buf[1] & 0x0f) << 8 | (buf[2] + 3);
 
 	if (!eit) {
 		eit = malloc(sizeof(struct eith));
@@ -192,7 +192,7 @@ int set_eith(struct eith **eitp, uint8_t *buf)
 int doEITH(struct secbuf *sec, void *data)
 {
 	int ret, i;
-	uint16_t service_id, ts_id, orig_nw_id;
+	uint16_t service_id, ts_id;
 	struct pat *pat = data;
 
 	if (pat->ver == -1) {
@@ -206,7 +206,6 @@ int doEITH(struct secbuf *sec, void *data)
 			sec->buf[0], sec->buf[1]);
 		return 2;
 	}
-
 	service_id = sec->buf[3] << 8 | sec->buf[4];
 
 	/* check cur/next flag, sec #, last sec # */
@@ -217,8 +216,6 @@ int doEITH(struct secbuf *sec, void *data)
 	}
 
 	ts_id = sec->buf[8] << 8 | sec->buf[9];
-	orig_nw_id = sec->buf[10] << 8 | sec->buf[11];
-
 	if (ts_id != pat->ts_id) {
 		dprintf("  bad ts_id:[%04hx] found\n", ts_id);
 		return 2;
@@ -235,7 +232,6 @@ int doEITH(struct secbuf *sec, void *data)
 		}
 		return ret;
 	}
-	
 	dprintf("  prog[%04hx] not found in PAT.\n", service_id);
 	return 1;
 }

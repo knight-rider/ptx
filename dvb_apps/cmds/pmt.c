@@ -29,14 +29,14 @@ int set_ca(uint8_t *b, struct ca *ca, int filter)
 
 int doPMT(struct secbuf *sec, void *data)
 {
-	int ver, len, i, num_es, pinfo_len, esinfo_len;
+	int ver, len, i,pinfo_len, esinfo_len;
 	int skip;
-	uint16_t prog_id, pcr_pid;
+	uint16_t prog_id;
 	uint8_t *b;
 	struct pmt *pmt = data;
 
 	/* TODO: verify CRC? */
-	if (sec->buf[0] != TID_PMT || sec->buf[1] & 0xf0 != 0xb0) {
+	if (sec->buf[0] != TID_PMT || (sec->buf[1] & 0xf0) != 0xb0) {
 		dprintf(" bad table header.\n");
 		return 2;
 	}
@@ -133,11 +133,11 @@ int doPMT(struct secbuf *sec, void *data)
 
 int doCAT(struct secbuf *sec, void *data)
 {
-	int ver, len, i;
+	int ver, len;
 	uint8_t *b;
 	struct cat *cat = data;
 
-	if (sec->buf[0] != TID_CAT || sec->buf[1] & 0xf0 != 0xb0) {
+	if (sec->buf[0] != TID_CAT || (sec->buf[1] & 0xf0) != 0xb0) {
 		dprintf(" bad table header.\n");
 		return 2;
 	}

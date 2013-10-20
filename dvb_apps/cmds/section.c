@@ -131,7 +131,7 @@ int doSection(uint8_t *buf, struct secbuf *sec,
 
 	/* fill the previous section */
 	if (len && sec->len && sec->cc <= 0x0f) {
-		sec->cc = (sec->cc++ & 0x0f);
+		sec->cc = (sec->cc + 1) & 0x0f;
 		if ((buf[3] & TS_CC_MASK) != sec->cc) {
 			sec->cc = 0x20;
 			dprintf("broken section data in pid:0x%04hx\n",

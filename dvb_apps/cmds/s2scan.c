@@ -142,7 +142,7 @@ setparam:
 }
 
 extern void
-aribstr_to_utf8(char *src, size_t srclen, char *dest, size_t destlen);
+aribstr_to_utf8(unsigned char *src, size_t srclen, unsigned char *dest, size_t destlen);
 
 static void
 make_output(unsigned char *sdt, int len)
@@ -190,18 +190,17 @@ make_output(unsigned char *sdt, int len)
 	}
 }
 
-static const char *usage = "\n"
-	"usage %s [options...]\n"
-	"	-a N	use /dev/dvb/adapterN\n"
-	"	-f N	use /dev/dvb/adapter?/frontendN\n"
-	"	-d N	use /dev/dvb/adapter?/demuxN\n"
-	"	-w N	max wait for lock [N * 0.1sec], default=5\n"
-	"	-l	use channel list to scan (read from stdin)\n"
-	"	-p	set LNB power on\n"
-	"	-v	include the LNB voltage setting in the output\n"
-	"	-b	BS mode\n"
-	"	-c	CS110 mode\n";
-
+#define USAGE "\n" \
+	"usage %s [options...]\n" \
+	"	-a N	use /dev/dvb/adapterN\n" \
+	"	-f N	use /dev/dvb/adapter?/frontendN\n" \
+	"	-d N	use /dev/dvb/adapter?/demuxN\n" \
+	"	-w N	max wait for lock [N * 0.1sec], default=5\n" \
+	"	-l	use channel list to scan (read from stdin)\n" \
+	"	-p	set LNB power on\n" \
+	"	-v	include the LNB voltage setting in the output\n" \
+	"	-b	BS mode\n" \
+	"	-c	CS110 mode\n"
 
 int
 main(int argc, char **argv)
@@ -258,7 +257,7 @@ main(int argc, char **argv)
 			mode = CS110;
 			break;
 		default:
-			fprintf(stderr, usage, argv[0]);
+			fprintf(stderr, USAGE, argv[0]);
 			return -1;
 		};
 	}
@@ -389,7 +388,7 @@ main(int argc, char **argv)
 		ret = read(pfd.fd, sdt, 3);
 		len = ((sdt[1] & 0x0F) << 8) + sdt[2];
 		if (ret != 3 || len > 1021 || len < 17) {
-			fprintf(stderr, "revcieved broken SDT(ret:%d len:%d).\n", ret, len);
+			fprintf(stderr, "received broken SDT(ret:%d len:%d).\n", ret, len);
 			continue;
 		}
 		if (read(pfd.fd, sdt + 3, len) < len) {

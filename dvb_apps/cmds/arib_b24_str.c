@@ -3,7 +3,7 @@
 
 /* exported function */
 void
-aribstr_to_utf8 (char *source, size_t len, char *dest, size_t buf_len);
+aribstr_to_utf8 (unsigned char *source, size_t len, unsigned char *dest, size_t buf_len);
 
 #define CODE_ASCII ('\x40')
 #define CODE_JISX0208_1978 ('\x40')
@@ -283,7 +283,7 @@ append_arib_char (gstr *euc_str, const struct code_state *state,
 
 
 void
-aribstr_to_utf8 (char *source, size_t len, char *dest, size_t buf_len)
+aribstr_to_utf8 (unsigned char *source, size_t len, unsigned char *dest, size_t buf_len)
 {
   int i, idx = 0;
   unsigned char prev = '\0';
@@ -488,7 +488,7 @@ aribstr_to_utf8 (char *source, size_t len, char *dest, size_t buf_len)
     goto bailout;
 
   p = euc_str.buf; // to keep euc_str.buf unmodified for later free()
-  iconv(cd, &p, &euc_str.used, &dest, &buf_len);
+  iconv(cd, &p, &euc_str.used, (char **)&dest, &buf_len);
   iconv_close(cd);
   if (buf_len > 0)
     *dest = '\0';

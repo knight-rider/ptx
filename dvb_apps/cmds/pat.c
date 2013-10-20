@@ -12,7 +12,7 @@ int doPAT(struct secbuf *sec, void *data)
 	struct pat *pat = data;
 
 	/* TODO: check CRC?, using crc32 module like dvb_net.c? */
-	if (sec->buf[0] != TID_PAT || sec->buf[1] & 0xf0 != 0xb0 ) {
+	if (sec->buf[0] != TID_PAT || (sec->buf[1] & 0xf0) != 0xb0 ) {
 		dprintf(" bad table header.\n");
 		return 2;
 	}

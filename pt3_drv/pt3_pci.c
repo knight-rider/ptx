@@ -880,7 +880,6 @@ pt3_pci_remove(struct pci_dev *pdev)
 		PT3_PRINTK(0, KERN_DEBUG, "free PT3 DEVICE.\n");
 	}
 	pci_disable_device(pdev);
-	pci_set_drvdata(pdev, NULL);
 }
 
 static int __devinit

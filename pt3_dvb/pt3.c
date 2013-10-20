@@ -424,7 +424,6 @@ static void pt3_remove(struct pci_dev *pdev)
 		kfree(pt3);
 	}
 	pci_disable_device(pdev);
-	pci_set_drvdata(pdev, NULL);
 }
 
 static int pt3_abort(PCI_DEV *pdev, int ret, char *fmt, ...)

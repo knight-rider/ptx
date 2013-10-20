@@ -1,5 +1,5 @@
 PROGRAMS = nitdump dumpts dumpts2 s2scan ptsdump restamp dumpeid tune
-CFLAGS += -Wformat=2 -Wall
+CFLAGS += -Wformat=2 -Wall -Werror
 
 all: $(PROGRAMS)
 

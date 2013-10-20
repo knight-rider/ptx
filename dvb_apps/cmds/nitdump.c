@@ -68,9 +68,8 @@ static int dump_si(struct isdbt_si *si)
 {
 	int i, j;
 	int rc = 0;
-	char pname[8], vpid[48], apid[32];
+	char pname[8];
 	struct pmt *pmt;
-	char *vp, *ap;
 
 	if (si->pat.ver == -1) {
 		fprintf(stderr, " PAT not recived.\n");
@@ -141,8 +140,6 @@ static int dump_si(struct isdbt_si *si)
 		else
 			snprintf(pname, sizeof(pname), "[%04hx]", pmt->prog_id);
 
-		vp = vpid;
-		ap = apid;
 		for (j=0; j<pmt->num_es; j++) {
 			fprintf(stderr,
 			        "        PES[%04hx]: type:%s tag:%02hhx",
@@ -166,38 +163,28 @@ static int dump_si(struct isdbt_si *si)
 	if (si->cat.ver != -1 && si->cat.num_cas) {
 		fprintf(stderr,	"CAT v%hhd %d cas. "
 			"[0]casid:%04hx EMM[%04hx] type:%02hhx\n",
-			si->cat.num_cas, si->cat.emm[0].cas_id,
+			si->cat.ver, si->cat.num_cas, si->cat.emm[0].cas_id,
 			si->cat.emm[0].ca_pid, si->cat.emm[0].type);
 	}
 	return 0;
 }
 
 
-static const char *usage = "\n"
-	"usage %s < TS-data-file\n";
-
-
 int main(int argc, char **argv)
 {
-
-	int fd, cfd;
-	struct dvb_frontend_parameters param;
-	struct dmx_pes_filter_params flt;
-	fe_status_t stat;
 	struct sigaction act;
 	struct itimerval it, itz;
 	struct isdbt_si si;
-	int opt, i, c, ret;
+	int opt, i, ret;
 	size_t len;
 	uint8_t buf[188];
 	uint8_t *p;
 	uint16_t pid;
-	int retry;
 
 	while ((opt = getopt(argc, argv, "h")) != -1) {
 		switch (opt) {
 		default:
-			fprintf(stderr, usage, argv[0]);
+			fprintf(stderr, "\nusage %s < TS-data-file\n", argv[0]);
 			return -1;
 		};
 	}
@@ -212,8 +199,6 @@ int main(int argc, char **argv)
 	itz.it_interval.tv_usec = 0;
 	itz.it_value.tv_sec = 0;
 	itz.it_value.tv_usec = 0;
-
-	c = 0;
 
 	cont = 1;
 
@@ -245,7 +230,6 @@ int main(int argc, char **argv)
 		}
  
 		p = &buf[1];
-		retry = 0;
 		do {
 			len = fread(p, sizeof(buf[0]), buf + 188 - p, stdin);
 			if (len < buf + 188 - p) {

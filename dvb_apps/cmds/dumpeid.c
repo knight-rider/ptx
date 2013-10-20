@@ -25,7 +25,7 @@
 #include "nitscan.h"
 
 extern void
-aribstr_to_utf8(char *src, size_t srclen, char *dest, size_t destlen);
+aribstr_to_utf8 (unsigned char *source, size_t len, unsigned char *dest, size_t buf_len);
 
 // undef val indicated by the 6digit BCD, 0xff:0xff:0xff
 #define DURATION_UNDEF (165 * 3600 + 165 * 60 + 165)
@@ -53,9 +53,9 @@ struct evinfo {
 		uint16_t progid;
 		uint16_t eid;
 	} group_orig; 
-	char *title;
+	uint8_t *title;
 	unsigned int title_len;
-	char *short_desc;
+	unsigned char *short_desc;
 	unsigned int desc_len;
 };
 
@@ -89,8 +89,7 @@ mjd2tm(int mjd, struct tm *t)
 static void
 output_event(struct evinfo *ev)
 {
-	char *buf;
-int i;
+	unsigned char *buf;
 
 	if (Params.info == 0) {
 		printf("%d\n", ev->eid);
@@ -148,12 +147,9 @@ int i;
 
 static int checkEIT(struct secbuf *sec, void *dummy)
 {
-	uint8_t *p;
-	uint8_t tid;
-	int len;
+	uint8_t *p, tid;
 	uint16_t progid;
-	int sect;
-	int dlen;
+	int len, sect, dlen;
 
 	p = sec->buf;
 	tid = p[0];
@@ -167,7 +163,7 @@ static int checkEIT(struct secbuf *sec, void *dummy)
 			return 0;
 	}
 
-	len = (p[1] & 0x0f) << 8 | p[2] + 3;
+	len = (p[1] & 0x0f) << 8 | (p[2] + 3);
 	if (len < 18) {
 		dprintf("broken (too short) EITp/f.\n");
 		return 1;
@@ -349,20 +345,19 @@ static void get_next_packet(uint8_t *buf)
 	}
 }
 
-static const char *usage = "\n"
-	"usage %s -p ID [options] < TS-data-file\n"
-	"	-p ID	program_ID(servie_ID) where EIT is searched\n"
-	"	-o	search EIT_others in the input TS stream\n"
-	"	-t TIME	find the event at TIME (default: 0/first-found one)\n"
-	"	-w SEC 	stop searching after SEC [sec.] at max. (default: 60)\n"
-	"	-i	output event info as well (default: just eventID)\n"
-	"	-i -i	surely output title & descrption (for a grouped event) \n";
-
+#define usage "\n" \
+	"usage %s -p ID [options] < TS-data-file\n" \
+	"	-p ID	program_ID(servie_ID) where EIT is searched\n" \
+	"	-o	search EIT_others in the input TS stream\n" \
+	"	-t TIME	find the event at TIME (default: 0/first-found one)\n" \
+	"	-w SEC 	stop searching after SEC [sec.] at max. (default: 60)\n" \
+	"	-i	output event info as well (default: just eventID)\n" \
+	"	-i -i	surely output title & descrption (for a grouped event) \n"
 
 int main(int argc, char **argv)
 {
 	struct sigaction act;
-	struct itimerval it, itz;
+	struct itimerval it;
 	int opt;
 	uint8_t buf[188];
 	uint16_t pid;
@@ -431,17 +426,11 @@ fprintf(stderr, "search for EIT on %s", ctime(&Params.when));
 	esec.max = sizeof(esbuf);
 	esec.buf = esbuf;
 
-
 	sigemptyset(&act.sa_mask);
 	act.sa_handler = stop_loop;
 	act.sa_flags = 0;
 	sigaction(SIGINT, &act, NULL);
 	sigaction(SIGALRM, &act, NULL);
-
-	itz.it_interval.tv_sec = 0;
-	itz.it_interval.tv_usec = 0;
-	itz.it_value.tv_sec = 0;
-	itz.it_value.tv_usec = 0;
 
 	it.it_interval.tv_sec = 0; /* one shot */
 	it.it_interval.tv_usec = 0;

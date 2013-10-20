@@ -7,11 +7,8 @@
 
 void print_pts(uint64_t base, int ret)
 {
-	int i;
-
 	printf("%#09" PRIx64, base);
-
-	printf(" %lu:%02d:%02d.%03d",
+	printf(" %lu:%02lu:%02lu.%03lu",
 		base / (90000 * 3600),
 		(base / (90000 * 60)) % 60,
 		(base / 90000) % 60,
@@ -27,7 +24,6 @@ int main(int argc, char **argv)
 
 	uint16_t pid;
 	uint64_t base;
-	uint16_t ext;
 	uint8_t *p;
 	unsigned char st;
 
@@ -50,7 +46,6 @@ int main(int argc, char **argv)
 			base = ((uint64_t)buf[6] << 25) | ((uint64_t)buf[7] << 17) |
 				((uint64_t)buf[8] << 9) | ((uint64_t)buf[9] << 1) |
 				((uint64_t)(buf[10] & 0x80) >> 7);
-			ext = ((uint16_t)(buf[10] & 0x01) << 8) | (uint16_t)buf[11];
 			printf("PCR:%#04hx ", pid);
 			print_pts(base, 1);
 		}
@@ -100,7 +95,6 @@ int main(int argc, char **argv)
 			((uint64_t)p[1] << 20) | ((uint64_t)(p[2] & 0xf8) << 12) |
 			((uint64_t)(p[2] & 0x03) << 13) | ((uint64_t)p[3] << 5) |
 			((uint64_t)(p[4] & 0xf8) >> 3);
-		ext = ((uint16_t)(p[4] & 0x03) << 7) | ((uint16_t)p[5] >> 1);
 		printf(" ESCR:%#02hhx ", st);
 		print_pts(base, 1);
 	}

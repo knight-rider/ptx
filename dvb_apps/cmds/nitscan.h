@@ -69,7 +69,7 @@ struct pat {
 	struct program prog[MAX_PROGRAM];
 
 	struct secbuf sec;
-	uint8_t sbuf[376];  /* 188 shoud be enough */
+	uint8_t sbuf[376];  /* 188 should be enough */
 };
 
 

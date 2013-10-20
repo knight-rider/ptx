@@ -7,7 +7,7 @@ int doTOT(struct secbuf *sec, void *data)
 	struct tot *tot = data;
 
 	/* TODO: check CRC?, using crc32 module like dvb_net.c? */
-	if (sec->buf[0] != TID_TOT || sec->buf[1] & 0xf0 != 0x30 ) {
+	if (sec->buf[0] != TID_TOT || (sec->buf[1] & 0xf0) != 0x30 ) {
 		dprintf(" bad table header.\n");
 		return 2;
 	}
