@@ -141,6 +141,7 @@ typedef struct {
 typedef struct {
 	MUTEX lock;
 	bool reset;
+	int lnb;
 
 	// PCI & I2C
 	PCI_DEV *pdev;

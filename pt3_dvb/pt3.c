@@ -38,11 +38,12 @@ static int pt3_set_tuner_sleep(PT3_ADAPTER *adap, bool sleep)
 
 static int pt3_update_lnb(PT3_BOARD *pt3)
 {
-	u8 i, nup = 0, lnb_eff = 0;
+	u8 i, lnb_eff = 0;
 
 	if (pt3->reset) {
 		writel(pt3_lnb[0].bits, pt3->reg[0] + REG_SYSTEM_W);
 		pt3->reset = false;
+		pt3->lnb = 0;
 	} else {
 		PT3_ADAPTER *adap;
 		mutex_lock(&pt3->lock);
@@ -50,7 +51,6 @@ static int pt3_update_lnb(PT3_BOARD *pt3)
 			adap = pt3->adap[i];
 			PT3_PRINTK(KERN_DEBUG, "#%d in_use %d sleep %d\n", adap->idx, adap->in_use, adap->sleep);
 			if ((adap->type == SYS_ISDBS) && (!adap->sleep)) {
-				nup++;
 				lnb_eff |= adap->voltage == SEC_VOLTAGE_13 ? 1 :
 				           adap->voltage == SEC_VOLTAGE_18 ? 2 :
 				           lnb;
@@ -60,10 +60,13 @@ static int pt3_update_lnb(PT3_BOARD *pt3)
 		if (unlikely(lnb_eff < 0 || 2 < lnb_eff)) {
 			PT3_PRINTK(KERN_ALERT, "Inconsistent LNB settings\n");
 			return -EINVAL;
-			}
-		if (nup) writel(pt3_lnb[lnb_eff].bits, pt3->reg[0] + REG_SYSTEM_W);
+		}
+		if (pt3->lnb != lnb_eff) {
+			writel(pt3_lnb[lnb_eff].bits, pt3->reg[0] + REG_SYSTEM_W);
+			pt3->lnb = lnb_eff;
+		}
 	}
-	PT3_PRINTK(KERN_INFO, "LNB = %s\n", pt3_lnb[lnb_eff].str);
+	PT3_PRINTK(KERN_INFO, "LNB=%s\n", pt3_lnb[lnb_eff].str);
 	return 0;
 }
 
