@@ -348,7 +348,6 @@ static int pt3_fe_set_voltage(DVB_FRONTEND *fe, fe_sec_voltage_t voltage)
 {
 	PT3_ADAPTER *adap = container_of(fe->dvb, PT3_ADAPTER, dvb);
 	adap->voltage = voltage;
-	pt3_update_lnb(adap->pt3);
 	return (adap->orig_voltage) ? adap->orig_voltage(fe, voltage) : 0;
 }
 
