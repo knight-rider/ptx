@@ -2,12 +2,12 @@
 #define PT3_BUS_CMD_ADDR0 4096 + 0
 #define PT3_BUS_CMD_ADDR1 4096 + 2042
 
-typedef struct {
-	__u32 read_addr, cmd_addr, cmd_count, cmd_pos, buf_pos, buf_size;
-	__u8 cmd_tmp, cmds[PT3_BUS_CMD_MAX], *buf;
-} PT3_BUS;
+struct pt3_bus {
+	u32 read_addr, cmd_addr, cmd_count, cmd_pos, buf_pos, buf_size;
+	u8 cmd_tmp, cmds[PT3_BUS_CMD_MAX], *buf;
+};
 
-typedef enum {
+enum pt3_bus_cmd {
 	I_END,
 	I_ADDRESS,
 	I_CLOCK_L,
@@ -15,15 +15,15 @@ typedef enum {
 	I_DATA_L,
 	I_DATA_H,
 	I_RESET,
-	I_SLEEP,	// Sleep 1ms
+	I_SLEEP,
 	I_DATA_L_NOP  = 0x08,
 	I_DATA_H_NOP  = 0x0c,
 	I_DATA_H_READ = 0x0d,
 	I_DATA_H_ACK0 = 0x0e,
 	I_DATA_H_ACK1 = 0x0f,
-} PT3_BUS_CMD;
+};
 
-static void pt3_bus_add_cmd(PT3_BUS *bus, PT3_BUS_CMD cmd)
+static void pt3_bus_add_cmd(struct pt3_bus *bus, enum pt3_bus_cmd cmd)
 {
 	if ((bus->cmd_count % 2) == 0) {
 		bus->cmd_tmp = cmd;
@@ -42,7 +42,7 @@ static void pt3_bus_add_cmd(PT3_BUS *bus, PT3_BUS_CMD cmd)
 	bus->cmd_count++;
 }
 
-__u8 pt3_bus_data1(PT3_BUS *bus, __u32 index)
+u8 pt3_bus_data1(struct pt3_bus *bus, u32 index)
 {
 	if (unlikely(!bus->buf)) {
 		PT3_PRINTK(KERN_ALERT, "buf is not ready.\n");
@@ -57,7 +57,7 @@ __u8 pt3_bus_data1(PT3_BUS *bus, __u32 index)
 	return bus->buf[index];
 }
 
-void pt3_bus_start(PT3_BUS *bus)
+void pt3_bus_start(struct pt3_bus *bus)
 {
 	pt3_bus_add_cmd(bus, I_DATA_H);
 	pt3_bus_add_cmd(bus, I_CLOCK_H);
@@ -65,17 +65,17 @@ void pt3_bus_start(PT3_BUS *bus)
 	pt3_bus_add_cmd(bus, I_CLOCK_L);
 }
 
-void pt3_bus_stop(PT3_BUS *bus)
+void pt3_bus_stop(struct pt3_bus *bus)
 {
 	pt3_bus_add_cmd(bus, I_DATA_L);
 	pt3_bus_add_cmd(bus, I_CLOCK_H);
 	pt3_bus_add_cmd(bus, I_DATA_H);
 }
 
-void pt3_bus_write(PT3_BUS *bus, const __u8 *data, __u32 size)
+void pt3_bus_write(struct pt3_bus *bus, const u8 *data, u32 size)
 {
-	__u32 i, j;
-	__u8 byte;
+	u32 i, j;
+	u8 byte;
 
 	for (i = 0; i < size; i++) {
 		byte = data[i];
@@ -86,10 +86,10 @@ void pt3_bus_write(PT3_BUS *bus, const __u8 *data, __u32 size)
 	}
 }
 
-__u32 pt3_bus_read(PT3_BUS *bus, __u8 *data, __u32 size)
+u32 pt3_bus_read(struct pt3_bus *bus, u8 *data, u32 size)
 {
-	__u32 i, j;
-	__u32 index;
+	u32 i, j;
+	u32 index;
 
 	for (i = 0; i < size; i++) {
 		for (j = 0; j < 8; j++) {
@@ -113,7 +113,7 @@ __u32 pt3_bus_read(PT3_BUS *bus, __u8 *data, __u32 size)
 	return index;
 }
 
-void pt3_bus_push_read_data(PT3_BUS *bus, __u8 data)
+void pt3_bus_push_read_data(struct pt3_bus *bus, u8 data)
 {
 	if (unlikely(bus->buf)) {
 		if (bus->buf_pos >= bus->buf_size) {
@@ -123,19 +123,16 @@ void pt3_bus_push_read_data(PT3_BUS *bus, __u8 data)
 		bus->buf[bus->buf_pos] = data;
 		bus->buf_pos++;
 	}
-#if 0
-	PT3_PRINTK(KERN_DEBUG, "bus read data=0x%02x\n", data);
-#endif
 }
 
-void pt3_bus_sleep(PT3_BUS *bus, __u32 ms)
+void pt3_bus_sleep(struct pt3_bus *bus, u32 ms)
 {
-	__u32 i;
+	u32 i;
 	for (i = 0; i< ms; i++)
 		pt3_bus_add_cmd(bus, I_SLEEP);
 }
 
-void pt3_bus_end(PT3_BUS *bus)
+void pt3_bus_end(struct pt3_bus *bus)
 {
 	pt3_bus_add_cmd(bus, I_END);
 
@@ -143,7 +140,7 @@ void pt3_bus_end(PT3_BUS *bus)
 		pt3_bus_add_cmd(bus, I_END);
 }
 
-void pt3_bus_reset(PT3_BUS *bus)
+void pt3_bus_reset(struct pt3_bus *bus)
 {
 	pt3_bus_add_cmd(bus, I_RESET);
 }

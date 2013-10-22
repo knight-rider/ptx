@@ -1,18 +1,18 @@
 #define PT3_I2C_DATA_OFFSET 2048
 
-bool pt3_i2c_is_clean(PT3_I2C *i2c)
+bool pt3_i2c_is_clean(struct pt3_i2c *i2c)
 {
 	return PT3_SHIFT_MASK(readl(i2c->reg[0] + REG_I2C_R), 3, 1);
 }
 
-void pt3_i2c_reset(PT3_I2C *i2c)
+void pt3_i2c_reset(struct pt3_i2c *i2c)
 {
-	writel(1 << 17, i2c->reg[0] + REG_I2C_W);	// 0x00020000
+	writel(1 << 17, i2c->reg[0] + REG_I2C_W);
 }
 
-static void pt3_i2c_wait(PT3_I2C *i2c, __u32 *data)
+static void pt3_i2c_wait(struct pt3_i2c *i2c, u32 *data)
 {
-	__u32 val;
+	u32 val;
 
 	while (1) {
 		val = readl(i2c->reg[0] + REG_I2C_R);
@@ -22,20 +22,20 @@ static void pt3_i2c_wait(PT3_I2C *i2c, __u32 *data)
 	if (data) *data = val;
 }
 
-void pt3_i2c_copy(PT3_I2C *i2c, PT3_BUS *bus)
+void pt3_i2c_copy(struct pt3_i2c *i2c, struct pt3_bus *bus)
 {
-	__u32 i;
-	__u8 *src = &bus->cmds[0];
+	u32 i;
+	u8 *src = &bus->cmds[0];
 	void __iomem *dst = i2c->reg[1] + PT3_I2C_DATA_OFFSET + (bus->cmd_addr / 2);
 
 	for (i = 0; i < bus->cmd_pos; i++)
 		writeb(src[i], dst + i);
 }
 
-int pt3_i2c_run(PT3_I2C *i2c, PT3_BUS *bus, bool copy)
+int pt3_i2c_run(struct pt3_i2c *i2c, struct pt3_bus *bus, bool copy)
 {
 	int ret = 0;
-	__u32 data, a, i, start_addr = bus->cmd_addr;
+	u32 data, a, i, start_addr = bus->cmd_addr;
 
 	mutex_lock(&i2c->lock);
 	if (copy)
@@ -44,7 +44,7 @@ int pt3_i2c_run(PT3_I2C *i2c, PT3_BUS *bus, bool copy)
 	pt3_i2c_wait(i2c, &data);
 	if (unlikely(start_addr >= (1 << 13)))
 		PT3_PRINTK(KERN_DEBUG, "start address is over.\n");
-	writel(1 << 16 | start_addr, i2c->reg[0] + REG_I2C_W);	// 0x00010000
+	writel(1 << 16 | start_addr, i2c->reg[0] + REG_I2C_W);
 	pt3_i2c_wait(i2c, &data);
 
 	if ((a = PT3_SHIFT_MASK(data, 1, 2))) {

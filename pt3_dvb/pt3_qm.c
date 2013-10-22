@@ -1,11 +1,11 @@
-static __u8 pt3_qm_reg_rw[] = {
+static u8 pt3_qm_reg_rw[] = {
 	0x48, 0x1c, 0xa0, 0x10, 0xbc, 0xc5, 0x20, 0x33,
 	0x06, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
 	0x00, 0xff, 0xf3, 0x00, 0x2a, 0x64, 0xa6, 0x86,
 	0x8c, 0xcf, 0xb8, 0xf1, 0xa8, 0xf2, 0x89, 0x00,
 };
 
-void pt3_qm_init_reg_param(PT3_QM *qm)
+void pt3_qm_init_reg_param(struct pt3_qm *qm)
 {
 	memcpy(qm->reg, pt3_qm_reg_rw, sizeof(pt3_qm_reg_rw));
 
@@ -16,7 +16,7 @@ void pt3_qm_init_reg_param(PT3_QM *qm)
 	qm->wait_time_search_normal = 15;
 }
 
-static int pt3_qm_write(PT3_QM *qm, PT3_BUS *bus, __u8 addr, __u8 data)
+static int pt3_qm_write(struct pt3_qm *qm, struct pt3_bus *bus, u8 addr, u8 data)
 {
 	int ret = pt3_tc_write_tuner(qm->adap, bus, addr, &data, sizeof(data));
 	qm->reg[addr] = data;
@@ -25,37 +25,33 @@ static int pt3_qm_write(PT3_QM *qm, PT3_BUS *bus, __u8 addr, __u8 data)
 
 #define PT3_QM_INIT_DUMMY_RESET 0x0c
 
-void pt3_qm_dummy_reset(PT3_QM *qm, PT3_BUS *bus)
+void pt3_qm_dummy_reset(struct pt3_qm *qm, struct pt3_bus *bus)
 {
 	pt3_qm_write(qm, bus, 0x01, PT3_QM_INIT_DUMMY_RESET);
 	pt3_qm_write(qm, bus, 0x01, PT3_QM_INIT_DUMMY_RESET);
 }
 
-static void pt3_qm_sleep(PT3_BUS *bus, __u32 ms)
+static void pt3_qm_sleep(struct pt3_bus *bus, u32 ms)
 {
 	if (bus) pt3_bus_sleep(bus, ms);
 	else PT3_WAIT_MS_INT(ms);
 }
 
-static int pt3_qm_read(PT3_QM *qm, PT3_BUS *bus, __u8 addr, __u8 *data)
+static int pt3_qm_read(struct pt3_qm *qm, struct pt3_bus *bus, u8 addr, u8 *data)
 {
 	int ret = 0;
 	if ((addr == 0x00) || (addr == 0x0d)) {
 		ret = pt3_tc_read_tuner(qm->adap, bus, addr, data);
-#if 0
-		if (!bus)
-			PT3_PRINTK(KERN_DEBUG "qm_read addr=0x%02x data=0x%02x\n", addr, *data);
-#endif
 	}
 	return ret;
 }
 
-static __u8 pt3_qm_flag[32] = {
+static u8 pt3_qm_flag[32] = {
 	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0,
 	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 };
 
-static int pt3_qm_set_sleep_mode(PT3_QM *qm, PT3_BUS *bus)
+static int pt3_qm_set_sleep_mode(struct pt3_qm *qm, struct pt3_bus *bus)
 {
 	int ret;
 
@@ -86,37 +82,33 @@ static int pt3_qm_set_sleep_mode(PT3_QM *qm, PT3_BUS *bus)
 	return ret;
 }
 
-static int pt3_qm_set_search_mode(PT3_QM *qm, PT3_BUS *bus)
+static int pt3_qm_set_search_mode(struct pt3_qm *qm, struct pt3_bus *bus)
 {
 	qm->reg[3] &= 0xfe;
 	return pt3_qm_write(qm, bus, 0x03, qm->reg[3]);
 }
 
-int pt3_qm_init(PT3_QM *qm, PT3_BUS *bus)
+int pt3_qm_init(struct pt3_qm *qm, struct pt3_bus *bus)
 {
-	__u8 i_data;
-	__u32 i;
+	u8 i_data;
+	u32 i;
 	int ret;
 
-	// soft reset on
 	if ((ret = pt3_qm_write(qm, bus, 0x01, PT3_QM_INIT_DUMMY_RESET)))
 		return ret;
 
 	pt3_qm_sleep(bus, 1);
 
-	// soft reset off
 	i_data = qm->reg[0x01] | 0x10;
 	if ((ret = pt3_qm_write(qm, bus, 0x01, i_data)))
 		return ret;
 
-	// ID check
 	if ((ret = pt3_qm_read(qm, bus, 0x00, &i_data)))
 		return ret;
 
 	if ((bus == NULL) && (i_data != 0x48))
 		return -EINVAL;
 
-	// LPF tuning on
 	pt3_qm_sleep(bus, 1);
 	qm->reg[0x0c] |= 0x40;
 	if ((ret = pt3_qm_write(qm, bus, 0x0c, qm->reg[0x0c])))
@@ -137,10 +129,10 @@ int pt3_qm_init(PT3_QM *qm, PT3_BUS *bus)
 	return ret;
 }
 
-int pt3_qm_set_sleep(PT3_QM *qm, bool sleep)
+int pt3_qm_set_sleep(struct pt3_qm *qm, bool sleep)
 {
 	int ret;
-	PT3_TS_PIN_MODE mode;
+	enum pt3_ts_pin_mode mode;
 
 	mode = sleep ? PT3_TS_PIN_MODE_LOW : PT3_TS_PIN_MODE_NORMAL;
 	qm->standby = sleep;
@@ -157,7 +149,7 @@ int pt3_qm_set_sleep(PT3_QM *qm, bool sleep)
 	return 0;
 }
 
-void pt3_qm_get_channel_freq(__u32 channel, __u32 *number, __u32 *freq)
+void pt3_qm_get_channel_freq(u32 channel, u32 *number, u32 *freq)
 {
 	if (channel < 12) {
 		*number = 1 + 2 * channel;
@@ -173,7 +165,7 @@ void pt3_qm_get_channel_freq(__u32 channel, __u32 *number, __u32 *freq)
 	}
 }
 
-static __u32 PT3_QM_FREQ_TABLE[9][3] = {
+static u32 PT3_QM_FREQ_TABLE[9][3] = {
 	{ 2151000, 1, 7 },
 	{ 1950000, 1, 6 },
 	{ 1800000, 1, 5 },
@@ -185,7 +177,7 @@ static __u32 PT3_QM_FREQ_TABLE[9][3] = {
 	{  950000, 0, 0 }
 };
 
-static __u32 SD_TABLE[24][2][3] = {
+static u32 SD_TABLE[24][2][3] = {
 	{{0x38fae1, 0x0d, 0x5},{0x39fae1, 0x0d, 0x5},},
 	{{0x3f570a, 0x0e, 0x3},{0x00570a, 0x0e, 0x3},},
 	{{0x05b333, 0x0e, 0x5},{0x06b333, 0x0e, 0x5},},
@@ -212,12 +204,12 @@ static __u32 SD_TABLE[24][2][3] = {
 	{{0x048000, 0x1d, 0x3},{0x058000, 0x1d, 0x3},},
 };
 
-static int pt3_qm_tuning(PT3_QM *qm, PT3_BUS *bus, __u32 *sd, __u32 channel)
+static int pt3_qm_tuning(struct pt3_qm *qm, struct pt3_bus *bus, u32 *sd, u32 channel)
 {
 	int ret;
-	PT3_ADAPTER *adap = qm->adap;
-	__u8 i_data;
-	__u32 index, i, N, A;
+	struct pt3_adapter *adap = qm->adap;
+	u8 i_data;
+	u32 index, i, N, A;
 
 	qm->reg[0x08] &= 0xf0;
 	qm->reg[0x08] |= 0x09;
@@ -250,10 +242,10 @@ static int pt3_qm_tuning(PT3_QM *qm, PT3_BUS *bus, __u32 *sd, __u32 channel)
 	return pt3_qm_write(qm, bus, 0x07, qm->reg[0x07]);
 }
 
-static int pt3_qm_local_lpf_tuning(PT3_QM *qm, PT3_BUS *bus, int lpf, __u32 channel)
+static int pt3_qm_local_lpf_tuning(struct pt3_qm *qm, struct pt3_bus *bus, int lpf, u32 channel)
 {
-	__u8 i_data;
-	__u32 sd = 0;
+	u8 i_data;
+	u32 sd = 0;
 	int ret = pt3_qm_tuning(qm, bus, &sd, channel);
 
 	if (ret)
@@ -303,7 +295,7 @@ static int pt3_qm_local_lpf_tuning(PT3_QM *qm, PT3_BUS *bus, int lpf, __u32 chan
 		i_data &= 0x7f;
 		if ((ret = pt3_qm_write(qm, bus, 0x0c, i_data)))
 			return ret;
-		pt3_qm_sleep(bus, 2);	// 1024usec
+		pt3_qm_sleep(bus, 2);
 
 		i_data = qm->reg[0x0c];
 		i_data |= 0x80;
@@ -318,7 +310,7 @@ static int pt3_qm_local_lpf_tuning(PT3_QM *qm, PT3_BUS *bus, int lpf, __u32 chan
 	return ret;
 }
 
-int pt3_qm_get_locked(PT3_QM *qm, bool *locked)
+int pt3_qm_get_locked(struct pt3_qm *qm, bool *locked)
 {
 	int ret;
 
@@ -329,11 +321,11 @@ int pt3_qm_get_locked(PT3_QM *qm, bool *locked)
 	return ret;
 }
 
-int pt3_qm_set_frequency(PT3_QM *qm, __u32 channel)
+int pt3_qm_set_frequency(struct pt3_qm *qm, u32 channel)
 {
 	int ret;
 	bool locked;
-	__u32 number, freq, freq_khz;
+	u32 number, freq, freq_khz;
 	struct timeval begin, now;
 
 	if ((ret = pt3_tc_set_agc_s(qm->adap, PT3_TC_AGC_MANUAL)))
@@ -363,7 +355,6 @@ int pt3_qm_set_frequency(PT3_QM *qm, __u32 channel)
 			break;
 		PT3_WAIT_MS_INT(1);
 	}
-	// PT3_PRINTK(KERN_DEBUG, "qm_get_locked %d ret=0x%x\n", locked, ret);
 	if (!locked)
 		return -ETIMEDOUT;
 

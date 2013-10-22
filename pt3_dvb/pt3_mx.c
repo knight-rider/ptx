@@ -1,8 +1,8 @@
 static struct {
-	__u32	freq;		// Channel center frequency @ kHz
-	__u32	freq_th;	// Offset frequency threshold @ kHz
-	__u8	shf_val;	// Spur shift value
-	__u8	shf_dir;	// Spur shift direction
+	u32	freq;
+	u32	freq_th;
+	u8	shf_val;
+	u8	shf_dir;
 } SHF_DVBT_TAB[] = {
 	{  64500, 500, 0x92, 0x07 },
 	{ 191500, 300, 0xE2, 0x07 },
@@ -23,20 +23,20 @@ static struct {
 	{ 153143, 500, 0x01, 0x07 }
 };
 
-static void pt3_mx_rftune(__u8 *data, __u32 *size, __u32 freq)
+static void pt3_mx_rftune(u8 *data, u32 *size, u32 freq)
 {
-	__u32 dig_rf_freq ,temp ,frac_divider, khz, mhz, i;
-	__u8 rf_data[] = {
-		0x13, 0x00,		// abort tune
+	u32 dig_rf_freq ,temp ,frac_divider, khz, mhz, i;
+	u8 rf_data[] = {
+		0x13, 0x00,
 		0x3B, 0xC0,
 		0x3B, 0x80,
-		0x10, 0x95,		// BW
+		0x10, 0x95,
 		0x1A, 0x05,
 		0x61, 0x00,
 		0x62, 0xA0,
-		0x11, 0x40,		// 2 bytes to store RF frequency
-		0x12, 0x0E,		// 2 bytes to store RF frequency
-		0x13, 0x01		// start tune
+		0x11, 0x40,
+		0x12, 0x0E,
+		0x13, 0x01
 	};
 
 	dig_rf_freq = 0;
@@ -59,8 +59,8 @@ static void pt3_mx_rftune(__u8 *data, __u32 *size, __u32 freq)
 	if (temp > 7812)
 		dig_rf_freq++;
 
-	rf_data[2 * (7) + 1] = (__u8)(dig_rf_freq);
-	rf_data[2 * (8) + 1] = (__u8)(dig_rf_freq >> 8);
+	rf_data[2 * (7) + 1] = (u8)(dig_rf_freq);
+	rf_data[2 * (8) + 1] = (u8)(dig_rf_freq >> 8);
 
 	for (i = 0; i < sizeof(SHF_DVBT_TAB)/sizeof(*SHF_DVBT_TAB); i++) {
 		if ( (freq >= (SHF_DVBT_TAB[i].freq - SHF_DVBT_TAB[i].freq_th) * khz) &&
@@ -76,26 +76,26 @@ static void pt3_mx_rftune(__u8 *data, __u32 *size, __u32 freq)
 	PT3_PRINTK(KERN_DEBUG, "mx_rftune freq=%d\n", freq);
 }
 
-static void pt3_mx_write(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 *data, size_t size)
+static void pt3_mx_write(struct pt3_adapter *adap, struct pt3_bus *bus, u8 *data, size_t size)
 {
 	pt3_tc_write_tuner_without_addr(adap, bus, data, size);
 }
 
-static void pt3_mx_standby(PT3_ADAPTER *adap)
+static void pt3_mx_standby(struct pt3_adapter *adap)
 {
-	__u8 data[4] = {0x01, 0x00, 0x13, 0x00};
+	u8 data[4] = {0x01, 0x00, 0x13, 0x00};
 	pt3_mx_write(adap, NULL, data, sizeof(data));
 }
 
-static void pt3_mx_set_register(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, __u8 value)
+static void pt3_mx_set_register(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8 value)
 {
-	__u8 data[2] = {addr, value};
+	u8 data[2] = {addr, value};
 	pt3_mx_write(adap, bus, data, sizeof(data));
 }
 
-static void pt3_mx_idac_setting(PT3_ADAPTER *adap, PT3_BUS *bus)
+static void pt3_mx_idac_setting(struct pt3_adapter *adap, struct pt3_bus *bus)
 {
-	__u8 data[] = {
+	u8 data[] = {
 		0x0D, 0x00,
 		0x0C, 0x67,
 		0x6F, 0x89,
@@ -108,10 +108,10 @@ static void pt3_mx_idac_setting(PT3_ADAPTER *adap, PT3_BUS *bus)
 	pt3_mx_write(adap, bus, data, sizeof(data));
 }
 
-static void pt3_mx_tuner_rftune(PT3_ADAPTER *adap, PT3_BUS *bus, __u32 freq)
+static void pt3_mx_tuner_rftune(struct pt3_adapter *adap, struct pt3_bus *bus, u32 freq)
 {
-	__u8 data[100];
-	__u32 size;
+	u8 data[100];
+	u32 size;
 
 	size = 0;
 	adap->freq = freq;
@@ -129,21 +129,21 @@ static void pt3_mx_tuner_rftune(PT3_ADAPTER *adap, PT3_BUS *bus, __u32 freq)
 	pt3_mx_idac_setting(adap, bus);
 }
 
-static void pt3_mx_wakeup(PT3_ADAPTER *adap)
+static void pt3_mx_wakeup(struct pt3_adapter *adap)
 {
-	__u8 data[2] = {0x01, 0x01};
+	u8 data[2] = {0x01, 0x01};
 
 	pt3_mx_write(adap, NULL, data, sizeof(data));
 	pt3_mx_tuner_rftune(adap, NULL, adap->freq);
 }
 
-static void pt3_mx_set_sleep_mode(PT3_ADAPTER *adap, bool sleep)
+static void pt3_mx_set_sleep_mode(struct pt3_adapter *adap, bool sleep)
 {
 	if (sleep)	pt3_mx_standby(adap);
 	else		pt3_mx_wakeup(adap);
 }
 
-int pt3_mx_set_sleep(PT3_ADAPTER *adap, bool sleep)
+int pt3_mx_set_sleep(struct pt3_adapter *adap, bool sleep)
 {
 	int ret;
 
@@ -160,7 +160,7 @@ int pt3_mx_set_sleep(PT3_ADAPTER *adap, bool sleep)
 	return 0;
 }
 
-static __u8 PT3_MX_FREQ_TABLE[][3] = {
+static u8 PT3_MX_FREQ_TABLE[][3] = {
 	{   2, 0,  3 },
 	{  12, 1, 22 },
 	{  21, 0, 12 },
@@ -168,10 +168,10 @@ static __u8 PT3_MX_FREQ_TABLE[][3] = {
 	{ 112, 0, 62 }
 };
 
-void pt3_mx_get_channel_frequency(PT3_ADAPTER *adap, __u32 channel, bool *catv, __u32 *number, __u32 *freq)
+void pt3_mx_get_channel_frequency(struct pt3_adapter *adap, u32 channel, bool *catv, u32 *number, u32 *freq)
 {
-	__u32 i;
-	__s32 freq_offset = 0;
+	u32 i;
+	s32 freq_offset = 0;
 
 	if (12 <= channel)	freq_offset += 2;
 	if (17 <= channel)	freq_offset -= 2;
@@ -187,7 +187,7 @@ void pt3_mx_get_channel_frequency(PT3_ADAPTER *adap, __u32 channel, bool *catv, 
 	}
 }
 
-static __u32 REAL_TABLE[112] = {
+static u32 REAL_TABLE[112] = {
 	0x058d3f49,0x05e8ccc9,0x06445a49,0x069fe7c9,0x06fb7549,
 	0x075702c9,0x07b29049,0x080e1dc9,0x0869ab49,0x08c538c9,
 	0x0920c649,0x097c53c9,0x09f665c9,0x0a51f349,0x0aad80c9,
@@ -213,17 +213,17 @@ static __u32 REAL_TABLE[112] = {
 	0x2d0290c9,0x2d5e1e49,
 };
 
-static void pt3_mx_read(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, __u8 *data)
+static void pt3_mx_read(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8 *data)
 {
-	__u8 write[2] = {0xfb, addr};
+	u8 write[2] = {0xfb, addr};
 
 	pt3_tc_write_tuner_without_addr(adap, bus, write, sizeof(write));
 	pt3_tc_read_tuner_without_addr(adap, bus, data);
 }
 
-static void pt3_mx_rfsynth_lock_status(PT3_ADAPTER *adap, PT3_BUS *bus, bool *locked)
+static void pt3_mx_rfsynth_lock_status(struct pt3_adapter *adap, struct pt3_bus *bus, bool *locked)
 {
-	__u8 data;
+	u8 data;
 
 	*locked = false;
 	pt3_mx_read(adap, bus, 0x16, &data);
@@ -232,9 +232,9 @@ static void pt3_mx_rfsynth_lock_status(PT3_ADAPTER *adap, PT3_BUS *bus, bool *lo
 		*locked = true;
 }
 
-static void pt3_mx_refsynth_lock_status(PT3_ADAPTER *adap, PT3_BUS *bus, bool *locked)
+static void pt3_mx_refsynth_lock_status(struct pt3_adapter *adap, struct pt3_bus *bus, bool *locked)
 {
-	__u8 data;
+	u8 data;
 
 	*locked = false;
 	pt3_mx_read(adap, bus, 0x16, &data);
@@ -243,7 +243,7 @@ static void pt3_mx_refsynth_lock_status(PT3_ADAPTER *adap, PT3_BUS *bus, bool *l
 		*locked = true;
 }
 
-bool pt3_mx_locked(PT3_ADAPTER *adap)
+bool pt3_mx_locked(struct pt3_adapter *adap)
 {
 	bool locked1 = false, locked2 = false;
 	struct timeval begin, now;
@@ -259,23 +259,19 @@ bool pt3_mx_locked(PT3_ADAPTER *adap)
 			break;
 		PT3_WAIT_MS_INT(1);
 	}
-#if 0
-	PT3_PRINTK(KERN_DEBUG, "mx locked1=%d locked2=%d\n", locked1, locked2);
-#endif
 	return locked1 && locked2;
 }
 
-int pt3_mx_set_frequency(PT3_ADAPTER *adap, __u32 channel, __s32 offset)
+int pt3_mx_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset)
 {
 	int ret;
 	bool catv;
-	__u32 number, freq, real_freq;
+	u32 number, freq, real_freq;
 
 	if ((ret = pt3_tc_set_agc_t(adap, PT3_TC_AGC_MANUAL)))
 		return ret;
 	pt3_mx_get_channel_frequency(adap, channel, &catv, &number, &freq);
  	PT3_PRINTK(KERN_DEBUG, "#%d ch%d%s no%d %dHz\n", adap->idx, channel, catv ? " CATV" : "", number, freq);
-	//real_freq = (7 * freq + 1 + offset) * 1000000.0/7.0;
 	real_freq = REAL_TABLE[channel];
 
 	pt3_mx_tuner_rftune(adap, NULL, real_freq);

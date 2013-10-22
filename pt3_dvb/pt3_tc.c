@@ -1,8 +1,8 @@
-int pt3_tc_write(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, const __u8 *data, __u32 size)
+int pt3_tc_write(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, const u8 *data, u32 size)
 {
 	int ret = 0;
-	__u8 buf;
-	PT3_BUS *p = bus ? bus : vzalloc(sizeof(PT3_BUS));
+	u8 buf;
+	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 
 	if (!p) {
 		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
@@ -24,21 +24,21 @@ int pt3_tc_write(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, const __u8 *data, _
 	return ret;
 }
 
-static int pt3_tc_write_pskmsrst(PT3_ADAPTER *adap)
+static int pt3_tc_write_pskmsrst(struct pt3_adapter *adap)
 {
-	__u8 buf = 0x01;
+	u8 buf = 0x01;
 	return pt3_tc_write(adap, NULL, 0x03, &buf, 1);
 }
 
-static int pt3_tc_write_imsrst(PT3_ADAPTER *adap)
+static int pt3_tc_write_imsrst(struct pt3_adapter *adap)
 {
-	__u8 buf = 0x01 << 6;
+	u8 buf = 0x01 << 6;
 	return pt3_tc_write(adap, NULL, 0x01, &buf, 1);
 }
 
-int pt3_tc_init(PT3_ADAPTER *adap)
+int pt3_tc_init(struct pt3_adapter *adap)
 {
-	__u8 buf = 0x10;
+	u8 buf = 0x10;
 
 	PT3_PRINTK(KERN_INFO, "#%d %s tuner=0x%x tc=0x%x\n", adap->idx, adap->str, adap->addr_tuner, adap->addr_tc);
 	if (adap->type == SYS_ISDBS) {
@@ -50,18 +50,18 @@ int pt3_tc_init(PT3_ADAPTER *adap)
 	}
 }
 
-int pt3_tc_set_powers(PT3_ADAPTER *adap, PT3_BUS *bus, bool tuner, bool amp)
+int pt3_tc_set_powers(struct pt3_adapter *adap, struct pt3_bus *bus, bool tuner, bool amp)
 {
-	__u8	tuner_power = tuner ? 0x03 : 0x02,
+	u8	tuner_power = tuner ? 0x03 : 0x02,
 		amp_power = amp ? 0x03 : 0x02,
 		data = (tuner_power << 6) | (0x01 << 4) | (amp_power << 2) | 0x01 << 0;
 	PT3_PRINTK(KERN_DEBUG, "#%d tuner %s amp %s\n", adap->idx, tuner ? "ON" : "OFF", amp ? "ON" : "OFF");
 	return pt3_tc_write(adap, bus, 0x1e, &data, 1);
 }
 
-int pt3_tc_set_ts_pins_mode(PT3_ADAPTER *adap, PT3_TS_PINS_MODE *mode)
+int pt3_tc_set_ts_pins_mode(struct pt3_adapter *adap, struct pt3_ts_pins_mode *mode)
 {
-	__u32	clock_data = mode->clock_data,
+	u32	clock_data = mode->clock_data,
 		byte = mode->byte,
 		valid = mode->valid;
 
@@ -69,7 +69,7 @@ int pt3_tc_set_ts_pins_mode(PT3_ADAPTER *adap, PT3_TS_PINS_MODE *mode)
 	if (byte)	byte++;
 	if (valid)	valid++;
 	if (adap->type == SYS_ISDBS) {
-		__u8 data[2];
+		u8 data[2];
 		int ret;
 		data[0] = 0x15 | (valid << 6);
 		data[1] = 0x04 | (clock_data << 4) | byte;
@@ -77,17 +77,17 @@ int pt3_tc_set_ts_pins_mode(PT3_ADAPTER *adap, PT3_TS_PINS_MODE *mode)
 		if ((ret = pt3_tc_write(adap, NULL, 0x1c, &data[0], 1)))	return ret;
 		return pt3_tc_write(adap, NULL, 0x1f, &data[1], 1);
 	} else {
-		__u8 data = (__u8)(0x01 | (clock_data << 6) | (byte << 4) | (valid << 2)) ;
+		u8 data = (u8)(0x01 | (clock_data << 6) | (byte << 4) | (valid << 2)) ;
 		return pt3_tc_write(adap, NULL, 0x1d, &data, 1);
 	}
 }
 
 #define PT3_TC_THROUGH 0xfe
-int pt3_tc_write_tuner(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, const __u8 *data, __u32 size)
+int pt3_tc_write_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, const u8 *data, u32 size)
 {
 	int ret = 0;
-	__u8 buf;
-	PT3_BUS *p = bus ? bus : vzalloc(sizeof(PT3_BUS));
+	u8 buf;
+	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 
 	if (!p) {
 		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
@@ -113,14 +113,14 @@ int pt3_tc_write_tuner(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, const __u8 *d
 	return ret;
 }
 
-int pt3_tc_read_tuner(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, __u8 *data)
+int pt3_tc_read_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8 *data)
 {
 	int ret = 0;
-	__u8 buf;
+	u8 buf;
 	size_t rindex;
-	PT3_BUS *p;
+	struct pt3_bus *p;
 
-	if (!(p = bus ? bus : vzalloc(sizeof(PT3_BUS)))) {
+	if (!(p = bus ? bus : vzalloc(sizeof(struct pt3_bus)))) {
 		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
 		return -ENOMEM;
 	}
@@ -154,30 +154,27 @@ int pt3_tc_read_tuner(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, __u8 *data)
 		data[0] = pt3_bus_data1(p, rindex);
 		vfree(p);
 	}
-//#if 0
 	PT3_PRINTK(KERN_DEBUG, "#%d read_tuner addr_tc=0x%x addr_tuner=0x%x\n",
 		   adap->idx, adap->addr_tc, adap->addr_tuner);
-//#endif
 	return ret;
 }
 
-typedef enum {
+enum pt3_tc_agc {
 	PT3_TC_AGC_AUTO,
 	PT3_TC_AGC_MANUAL,
-} PT3_TC_AGC;
+};
 
-static __u8 agc_data_s[2] = { 0xb0, 0x30 };
+static u8 agc_data_s[2] = { 0xb0, 0x30 };
 
-__u32 pt3_tc_index(PT3_ADAPTER *adap)
+u32 pt3_tc_index(struct pt3_adapter *adap)
 {
 	return PT3_SHIFT_MASK(adap->addr_tc, 1, 1);
 }
 
-// ISDB_S
-int pt3_tc_set_agc_s(PT3_ADAPTER *adap, PT3_TC_AGC agc)
+int pt3_tc_set_agc_s(struct pt3_adapter *adap, enum pt3_tc_agc agc)
 {
 	int ret;
-	__u8 data = (agc == PT3_TC_AGC_AUTO) ? 0xff : 0x00;
+	u8 data = (agc == PT3_TC_AGC_AUTO) ? 0xff : 0x00;
 	if ((ret = pt3_tc_write(adap, NULL, 0x0a, &data, 1)))	return ret;
 
 	data = agc_data_s[pt3_tc_index(adap)];
@@ -189,17 +186,16 @@ int pt3_tc_set_agc_s(PT3_ADAPTER *adap, PT3_TC_AGC agc)
 	return pt3_tc_write_pskmsrst(adap);
 }
 
-int pt3_tc_set_sleep_s(PT3_ADAPTER *adap, PT3_BUS *bus, bool sleep)
+int pt3_tc_set_sleep_s(struct pt3_adapter *adap, struct pt3_bus *bus, bool sleep)
 {
-	__u8 buf = sleep ? 1 : 0;
+	u8 buf = sleep ? 1 : 0;
 	return pt3_tc_write(adap, bus, 0x17, &buf, 1);
 }
 
-// ISDB_T
-int pt3_tc_set_agc_t(PT3_ADAPTER *adap, PT3_TC_AGC agc)
+int pt3_tc_set_agc_t(struct pt3_adapter *adap, enum pt3_tc_agc agc)
 {
 	int ret;
-	__u8 data = (agc == PT3_TC_AGC_AUTO) ? 0x40 : 0x00;
+	u8 data = (agc == PT3_TC_AGC_AUTO) ? 0x40 : 0x00;
 
 	if ((ret = pt3_tc_write(adap, NULL, 0x25, &data, 1)))	return ret;
 
@@ -209,11 +205,11 @@ int pt3_tc_set_agc_t(PT3_ADAPTER *adap, PT3_TC_AGC agc)
 	return pt3_tc_write_imsrst(adap);
 }
 
-int pt3_tc_write_tuner_without_addr(PT3_ADAPTER *adap, PT3_BUS *bus, const __u8 *data, __u32 size)
+int pt3_tc_write_tuner_without_addr(struct pt3_adapter *adap, struct pt3_bus *bus, const u8 *data, u32 size)
 {
 	int ret = 0;
-	__u8 buf;
-	PT3_BUS *p = bus ? bus : vzalloc(sizeof(PT3_BUS));
+	u8 buf;
+	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 	if (!p) {
 		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
 		return -ENOMEM;
@@ -237,27 +233,25 @@ int pt3_tc_write_tuner_without_addr(PT3_ADAPTER *adap, PT3_BUS *bus, const __u8 
 	return ret;
 }
 
-int pt3_tc_write_sleep_time(PT3_ADAPTER *adap, int sleep)
+int pt3_tc_write_sleep_time(struct pt3_adapter *adap, int sleep)
 {
-	__u8 data = (1 << 7) | ((sleep ? 1 : 0) << 4);
+	u8 data = (1 << 7) | ((sleep ? 1 : 0) << 4);
 	return pt3_tc_write(adap, NULL, 0x03, &data, 1);
 }
 
-__u32 pt3_tc_time_diff(struct timeval *st, struct timeval *et)
+u32 pt3_tc_time_diff(struct timeval *st, struct timeval *et)
 {
-	__u32 diff = ((et->tv_sec - st->tv_sec) * 1000000 + (et->tv_usec - st->tv_usec)) / 1000;
-#if 0
+	u32 diff = ((et->tv_sec - st->tv_sec) * 1000000 + (et->tv_usec - st->tv_usec)) / 1000;
 	PT3_PRINTK(KERN_DEBUG, "time diff = %d\n", diff);
-#endif
 	return diff;
 }
 
-int pt3_tc_read_tuner_without_addr(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 *data)
+int pt3_tc_read_tuner_without_addr(struct pt3_adapter *adap, struct pt3_bus *bus, u8 *data)
 {
 	int ret = 0;
-	__u8 buf;
-	__u32 rindex;
-	PT3_BUS *p = bus ? bus : vzalloc(sizeof(PT3_BUS));
+	u8 buf;
+	u32 rindex;
+	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 
 	if (!p) {
 		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
@@ -284,18 +278,17 @@ int pt3_tc_read_tuner_without_addr(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 *data)
 		data[0] = pt3_bus_data1(p, rindex);
 		vfree(p);
 	}
-#if 0
-	PT3_PRINTK(KERN_DEBUG, "read_tuner_without addr_tc=0x%x addr_tuner=0x%x\n", adap->addr_tc, adap->addr_tuner);
-#endif
+	PT3_PRINTK(KERN_DEBUG, "#%d read_tuner_without addr_tc=0x%x addr_tuner=0x%x\n",
+		adap->idx, adap->addr_tc, adap->addr_tuner);
 	return ret;
 }
 
-static int pt3_tc_read(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, __u8 *data, __u32 size)
+static int pt3_tc_read(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8 *data, u32 size)
 {
 	int ret = 0;
-	__u8 buf[size];
-	__u32 i, rindex;
-	PT3_BUS *p = bus ? bus : vzalloc(sizeof(PT3_BUS));
+	u8 buf[size];
+	u32 i, rindex;
+	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 	if (!p) {
 		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
 		return -ENOMEM;
@@ -322,9 +315,9 @@ static int pt3_tc_read(PT3_ADAPTER *adap, PT3_BUS *bus, __u8 addr, __u8 *data, _
 	return ret;
 }
 
-static __u32 pt3_tc_byten(const __u8 *data, __u32 n)
+static u32 pt3_tc_byten(const u8 *data, u32 n)
 {
-	__u32 i, value = 0;
+	u32 i, value = 0;
 
 	for (i = 0; i < n; i++) {
 		value <<= 8;
@@ -333,25 +326,25 @@ static __u32 pt3_tc_byten(const __u8 *data, __u32 n)
 	return value;
 }
 
-int pt3_tc_read_cn_s(PT3_ADAPTER *adap, PT3_BUS *bus, __u32 *cn)
+int pt3_tc_read_cn_s(struct pt3_adapter *adap, struct pt3_bus *bus, u32 *cn)
 {
-	__u8 data[2];
+	u8 data[2];
 	int ret = pt3_tc_read(adap, bus, 0xbc, data, sizeof(data));
 	if (!ret) *cn = pt3_tc_byten(data,2);
 	return ret;
 }
 
-int pt3_tc_read_cndat_t(PT3_ADAPTER *adap, PT3_BUS *bus, __u32 *cn)
+int pt3_tc_read_cndat_t(struct pt3_adapter *adap, struct pt3_bus *bus, u32 *cn)
 {
-	__u8 data[3];
+	u8 data[3];
 	int ret = pt3_tc_read(adap, bus, 0x8b, data, sizeof(data));
 	if (!ret) *cn = pt3_tc_byten(data,3);
 	return ret;
 }
 
-int pt3_tc_read_retryov_tmunvld_fulock(PT3_ADAPTER *adap, PT3_BUS *bus, int *retryov, int *tmunvld, int *fulock)
+int pt3_tc_read_retryov_tmunvld_fulock(struct pt3_adapter *adap, struct pt3_bus *bus, int *retryov, int *tmunvld, int *fulock)
 {
-	__u8 data;
+	u8 data;
 	int ret = pt3_tc_read(adap, bus, 0x80, &data, 1);
 	if (!ret) {
 		*retryov = PT3_SHIFT_MASK(data, 7, 1) ? 1 : 0;
@@ -361,11 +354,11 @@ int pt3_tc_read_retryov_tmunvld_fulock(PT3_ADAPTER *adap, PT3_BUS *bus, int *ret
 	return ret;
 }
 
-int pt3_tc_read_tmcc_t(PT3_ADAPTER *adap, PT3_BUS *bus, TMCC_T *tmcc)
+int pt3_tc_read_tmcc_t(struct pt3_adapter *adap, struct pt3_bus *bus, struct tmcc_t *tmcc)
 {
 	int ret;
-	__u8 data[8];
-	__u32 interleave0h, interleave0l, segment1h, segment1l;
+	u8 data[8];
+	u32 interleave0h, interleave0l, segment1h, segment1l;
 
 	if ((ret = pt3_tc_read(adap, bus, 0xb2+0, &data[0], 4)))	return ret;
 	if ((ret = pt3_tc_read(adap, bus, 0xb2+4, &data[4], 4)))	return ret;
@@ -400,15 +393,15 @@ int pt3_tc_read_tmcc_t(PT3_ADAPTER *adap, PT3_BUS *bus, TMCC_T *tmcc)
 	return ret;
 }
 
-int pt3_tc_read_tmcc_s(PT3_ADAPTER *adap, PT3_BUS *bus, TMCC_S *tmcc)
+int pt3_tc_read_tmcc_s(struct pt3_adapter *adap, struct pt3_bus *bus, struct tmcc_s *tmcc)
 {
 	enum {
 		BASE = 0xc5,
 		SIZE = 0xe5 - BASE + 1
 	};
 	int ret;
-	__u8 data[SIZE];
-	__u32 i, byte_offset, bit_offset;
+	u8 data[SIZE];
+	u32 i, byte_offset, bit_offset;
 
 	if ((ret = pt3_tc_read(adap, bus, 0xc3, data, 1)))	return ret;
 	if (PT3_SHIFT_MASK(data[0], 4, 1))			return -EBADMSG;
@@ -433,15 +426,15 @@ int pt3_tc_read_tmcc_s(PT3_ADAPTER *adap, PT3_BUS *bus, TMCC_S *tmcc)
 	return ret;
 }
 
-int pt3_tc_write_id_s(PT3_ADAPTER *adap, PT3_BUS *bus, __u16 id)
+int pt3_tc_write_id_s(struct pt3_adapter *adap, struct pt3_bus *bus, u16 id)
 {
-	__u8 data[2] = { id >> 8, (__u8)id };
+	u8 data[2] = { id >> 8, (u8)id };
 	return pt3_tc_write(adap, bus, 0x8f, data, sizeof(data));
 }
 
-int pt3_tc_read_id_s(PT3_ADAPTER *adap, PT3_BUS *bus, __u16 *id)
+int pt3_tc_read_id_s(struct pt3_adapter *adap, struct pt3_bus *bus, u16 *id)
 {
-	__u8 data[2];
+	u8 data[2];
 	int ret = pt3_tc_read(adap, bus, 0xe6, data, sizeof(data));
 	if (!ret) *id = pt3_tc_byten(data,2);
 	return ret;

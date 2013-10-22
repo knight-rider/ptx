@@ -13,10 +13,8 @@
 #define ID_DEV_PT3	0x4c15
 
 #define PT3_NR_ADAPS 4
+#define PT3_SHIFT_MASK(val, shift, mask) (((val) >> (shift)) & (((u64)1<<(mask))-1))
 
-#define PT3_SHIFT_MASK(val, shift, mask) (((val) >> (shift)) & (((__u64)1<<(mask))-1))
-
-// register idx
 #define REG_VERSION	0x00	/*	R	Version		*/
 #define REG_BUS		0x04	/*	R	Bus		*/
 #define REG_SYSTEM_W	0x08	/*	W	System		*/
@@ -40,161 +38,139 @@
 #define PT3_PRINTK(level, fmt, args...)\
 	{if (debug + 48 >= level[1]) printk(DRV_NAME " " level " " fmt, ##args);}
 
-static int lnb = 2;	// LNB OFF:0 +11V:1 +15V:2
+static int lnb = 2;
 module_param(lnb, int, 0);
 MODULE_PARM_DESC(lnb, "LNB level (0:OFF 1:+11V 2:+15V)");
 
-int debug = 0;		// 1 normal messages, 0 quiet .. 7 verbose
+int debug = 0;
 module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "debug level (0-7)");
 
-MODULE_AUTHOR("Bud R <knightrider @ are.ma>");
-MODULE_DESCRIPTION("Earthsoft PT3 DVB Driver");
-MODULE_LICENSE("GPL");
-
-typedef struct file FILE;
-typedef struct mutex MUTEX;
-typedef struct pci_dev PCI_DEV;
-typedef struct pci_device_id PCI_DEV_ID;
-typedef struct task_struct TASK_STRUCT;
-typedef struct dvb_adapter DVB_ADAPTER;
-typedef struct dvb_demux DVB_DEMUX;
-typedef struct dvb_demux_feed DVB_DEMUX_FEED;
-typedef struct dmxdev DMXDEV;
-typedef struct dvb_frontend DVB_FRONTEND;
-typedef struct dvb_frontend_ops DVB_FRONTEND_OPS;
-
-static PCI_DEV_ID pt3_id_table[] = {
+static struct pci_device_id pt3_id_table[] = {
 	{ PCI_DEVICE(ID_VEN_ALTERA, ID_DEV_PT3) },
 	{ },
 };
 MODULE_DEVICE_TABLE(pci, pt3_id_table);
 
-typedef struct {
+struct pt3_dma_page {
 	dma_addr_t addr;
-	__u8 *data;
-	__u32 size, data_pos;
-} PT3_DMA_PAGE;
+	u8 *data;
+	u32 size, data_pos;
+};
 
-typedef struct {
-	__u8 __iomem *reg[2];
-	MUTEX lock;
-} PT3_I2C;
+struct pt3_i2c {
+	u8 __iomem *reg[2];
+	struct mutex lock;
+};
 
-typedef enum {
+enum {
 	LAYER_INDEX_L = 0,
 	LAYER_INDEX_H,
 
 	LAYER_INDEX_A = 0,
 	LAYER_INDEX_B,
 	LAYER_INDEX_C
-} LAYER_INDEX;
+};
 
-typedef enum {
+enum {
 	LAYER_COUNT_S = LAYER_INDEX_H + 1,
 	LAYER_COUNT_T = LAYER_INDEX_C + 1,
-} LAYER_COUNT;
+};
 
-// Transmission and Multiplexing Configuration Control
+struct tmcc_s {
+	u32 indicator;
+	u32 mode[4];
+	u32 slot[4];
+	u32 id[8];
+	u32 emergency;
+	u32 uplink;
+	u32 extflag;
+};
 
-typedef struct {
-	__u32 indicator;
-	__u32 mode[4];
-	__u32 slot[4];
-	__u32 id[8];
-	__u32 emergency;
-	__u32 uplink;
-	__u32 extflag;
-} TMCC_S;
+struct tmcc_t {
+	u32 system;
+	u32 indicator;
+	u32 emergency;
+	u32 partial;
+	u32 mode[LAYER_COUNT_T];
+	u32 rate[LAYER_COUNT_T];
+	u32 interleave[LAYER_COUNT_T];
+	u32 segment[LAYER_COUNT_T];
+};
 
-typedef struct {
-	__u32 system;
-	__u32 indicator;
-	__u32 emergency;
-	__u32 partial;
-	__u32 mode[LAYER_COUNT_T];
-	__u32 rate[LAYER_COUNT_T];
-	__u32 interleave[LAYER_COUNT_T];
-	__u32 segment[LAYER_COUNT_T];
-} TMCC_T;
+struct pt3_adapter;
 
-typedef struct _PT3_ADAPTER PT3_ADAPTER;
-
-typedef struct {
-	PT3_ADAPTER *adap;
+struct pt3_dma {
+	struct pt3_adapter *adap;
 	bool enabled;
-	__u32 ts_pos, ts_count, desc_count;
-	PT3_DMA_PAGE *ts_info, *desc_info;
-	MUTEX lock;
-} PT3_DMA;
+	u32 ts_pos, ts_count, desc_count;
+	struct pt3_dma_page *ts_info, *desc_info;
+	struct mutex lock;
+};
 
-typedef struct {
-	PT3_ADAPTER *adap;
-	__u8 reg[32];
+struct pt3_qm {
+	struct pt3_adapter *adap;
+	u8 reg[32];
 
-	// QM PARAM
 	bool standby;
-	__u32 wait_time_lpf, wait_time_search_fast, wait_time_search_normal;
-	TMCC_S tmcc;
-} PT3_QM;
+	u32 wait_time_lpf, wait_time_search_fast, wait_time_search_normal;
+	struct tmcc_s tmcc;
+};
 
-typedef struct {
-	MUTEX lock;
+struct pt3_board {
+	struct mutex lock;
 	bool reset;
 	int lnb;
 
-	// PCI & I2C
-	PCI_DEV *pdev;
+	struct pci_dev *pdev;
 	void __iomem *reg[2];
 	int bars;
-	PT3_I2C *i2c;
+	struct pt3_i2c *i2c;
 
-	PT3_ADAPTER *adap[PT3_NR_ADAPS];
-} PT3_BOARD;
+	struct pt3_adapter *adap[PT3_NR_ADAPS];
+};
 
-struct _PT3_ADAPTER {
-	MUTEX lock;
-	PT3_BOARD *pt3;
+struct pt3_adapter {
+	struct mutex lock;
+	struct pt3_board *pt3;
 
-	// tuner & DMA
 	int idx, init_ch;
 	char *str;
 	fe_delivery_system_t type;
 	bool in_use, sleep;
-	__u32 channel;
-	__s32 offset;
-	__u8 addr_tc, addr_tuner;
-	__u32 freq;
-	PT3_QM *qm;
-	PT3_DMA *dma;
-	TASK_STRUCT *kthread;
+	u32 channel;
+	s32 offset;
+	u8 addr_tc, addr_tuner;
+	u32 freq;
+	struct pt3_qm *qm;
+	struct pt3_dma *dma;
+	struct task_struct *kthread;
 
-	// DVB
-	DVB_ADAPTER dvb;
-	DVB_DEMUX demux;
+	struct dvb_adapter dvb;
+	struct dvb_demux demux;
 	int users;
-	DMXDEV dmxdev;
-	DVB_FRONTEND *fe;
-	int (*orig_voltage)(DVB_FRONTEND *fe, fe_sec_voltage_t voltage);
-	int (*orig_sleep  )(DVB_FRONTEND *fe                          );
-	int (*orig_init   )(DVB_FRONTEND *fe                          );
+	struct dmxdev dmxdev;
+	struct dvb_frontend *fe;
+	int (*orig_voltage)(struct dvb_frontend *fe, fe_sec_voltage_t voltage);
+	int (*orig_sleep  )(struct dvb_frontend *fe                          );
+	int (*orig_init   )(struct dvb_frontend *fe                          );
 	fe_sec_voltage_t voltage;
 };
 
 struct {
 	fe_delivery_system_t type;
-	__u8 addr_tuner, addr_tc;
+	u8 addr_tuner, addr_tc;
 	int init_ch;
 	char *str;
 } pt3_config[] = {
-	{SYS_ISDBS, 0x63, 0b00010001,  0, "ISDB_S"},
-	{SYS_ISDBS, 0x60, 0b00010011,  0, "ISDB_S"},
-	{SYS_ISDBT, 0x62, 0b00010000, 70, "ISDB_T"},
-	{SYS_ISDBT, 0x61, 0b00010010, 71, "ISDB_T"},
+	{SYS_ISDBS, 0x63, 0b00010001,  0, "ISDB-S"},
+	{SYS_ISDBS, 0x60, 0b00010011,  0, "ISDB-S"},
+	{SYS_ISDBT, 0x62, 0b00010000, 70, "ISDB-T"},
+	{SYS_ISDBT, 0x61, 0b00010010, 71, "ISDB-T"},
 };
 
 struct {
-	__u32 bits;
+	u32 bits;
 	char *str;
 } pt3_lnb[] = {
 	{0b1100,  "0V"},
@@ -202,15 +178,15 @@ struct {
 	{0b1111, "15V"},
 };
 
-typedef enum {
+enum pt3_ts_pin_mode {
 	PT3_TS_PIN_MODE_NORMAL,
 	PT3_TS_PIN_MODE_LOW,
 	PT3_TS_PIN_MODE_HIGH,
-} PT3_TS_PIN_MODE;
+};
 
-typedef struct {
-	PT3_TS_PIN_MODE clock_data, byte, valid;
-} PT3_TS_PINS_MODE;
+struct pt3_ts_pins_mode {
+	enum pt3_ts_pin_mode clock_data, byte, valid;
+};
 
 #endif
 

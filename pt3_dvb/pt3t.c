@@ -1,6 +1,6 @@
 #include "dvb_math.h"
 
-typedef enum {
+enum pt3t_tune_state {
 	PT3T_IDLE,
 	PT3T_SET_FREQUENCY,
 	PT3T_CHECK_FREQUENCY,
@@ -8,18 +8,18 @@ typedef enum {
 	PT3T_CHECK_MODULATION,
 	PT3T_TRACK,
 	PT3T_ABORT,
-} PT3T_TUNE_STATE;
+};
 
-typedef struct {
-	PT3_ADAPTER *adap;
-	DVB_FRONTEND fe;
-	PT3T_TUNE_STATE tune_state;
-} PT3T_STATE;
+struct pt3t_state {
+	struct pt3_adapter *adap;
+	struct dvb_frontend fe;
+	enum pt3t_tune_state tune_state;
+};
 
-static int pt3t_read_snr(DVB_FRONTEND *fe, u16 *snr) // signal to noise ratio
+static int pt3t_read_snr(struct dvb_frontend *fe, u16 *snr)
 {
-	PT3T_STATE *state = fe->demodulator_priv;
-	PT3_ADAPTER *adap = state->adap;
+	struct pt3t_state *state = fe->demodulator_priv;
+	struct pt3_adapter *adap = state->adap;
 	u32 cn = 0;
 	s32 x, y;
 
@@ -37,30 +37,30 @@ static int pt3t_read_snr(DVB_FRONTEND *fe, u16 *snr) // signal to noise ratio
 	return 0;
 }
 
-static int pt3t_get_frontend_algo(DVB_FRONTEND *fe)
+static int pt3t_get_frontend_algo(struct dvb_frontend *fe)
 {
 	return DVBFE_ALGO_HW;
 }
 
-static void pt3t_release(DVB_FRONTEND *fe)
+static void pt3t_release(struct dvb_frontend *fe)
 {
 	kfree(fe->demodulator_priv);
 }
 
-static int pt3t_init(DVB_FRONTEND *fe)
+static int pt3t_init(struct dvb_frontend *fe)
 {
-	PT3T_STATE *state = fe->demodulator_priv;
+	struct pt3t_state *state = fe->demodulator_priv;
 	state->tune_state = PT3T_IDLE;
 	return pt3_mx_set_sleep(state->adap, false);
 }
 
-static int pt3t_sleep(DVB_FRONTEND *fe)
+static int pt3t_sleep(struct dvb_frontend *fe)
 {
-	PT3T_STATE *state = fe->demodulator_priv;
+	struct pt3t_state *state = fe->demodulator_priv;
 	return pt3_mx_set_sleep(state->adap, true);
 }
 
-static int pt3t_get_tmcc(PT3_ADAPTER *adap, TMCC_T *tmcc)
+static int pt3t_get_tmcc(struct pt3_adapter *adap, struct tmcc_t *tmcc)
 {
 	int b = 0, retryov, tmunvld, fulock;
 
@@ -81,9 +81,9 @@ static int pt3t_get_tmcc(PT3_ADAPTER *adap, TMCC_T *tmcc)
 	return b ? 0 : -EBADMSG;
 }
 
-static int pt3t_read_status(DVB_FRONTEND *fe, fe_status_t *status)
+static int pt3t_read_status(struct dvb_frontend *fe, fe_status_t *status)
 {
-	PT3T_STATE *state = fe->demodulator_priv;
+	struct pt3t_state *state = fe->demodulator_priv;
 
 	switch (state->tune_state) {
 	case PT3T_IDLE:
@@ -108,26 +108,26 @@ static int pt3t_read_status(DVB_FRONTEND *fe, fe_status_t *status)
 #define NHK (REAL_TABLE[77])
 int pt3t_freq(int freq)
 {
-	if (freq > 255) return freq;			// real_freq
-	if (freq > 127) return REAL_TABLE[freq - 128];	// freqno (io_no)
-	if (freq > 63) {				// CATV
+	if (freq > 255) return freq;
+	if (freq > 127) return REAL_TABLE[freq - 128];
+	if (freq > 63) {
 		freq -= 64;
-		if (freq > 22) return REAL_TABLE[freq - 1];	// C23-C62
-		if (freq > 12) return REAL_TABLE[freq - 10];	// C13-C22
+		if (freq > 22) return REAL_TABLE[freq - 1];
+		if (freq > 12) return REAL_TABLE[freq - 10];
 		return NHK;
 	}
 	if (freq > 62) return NHK;
-	if (freq > 12) return REAL_TABLE[freq + 50];	// 13-62
-	if (freq >  3) return REAL_TABLE[freq +  9];	//  4-12
-	if (freq)      return REAL_TABLE[freq -  1];	//  1-3
+	if (freq > 12) return REAL_TABLE[freq + 50];
+	if (freq >  3) return REAL_TABLE[freq +  9];
+	if (freq)      return REAL_TABLE[freq -  1];
 	return NHK;
 }
 
-static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, unsigned int *delay, fe_status_t *status)
+static int pt3t_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flags, unsigned int *delay, fe_status_t *status)
 {
-	TMCC_T tmcc_t;
+	struct tmcc_t tmcc_t;
 	int ret, i;
-	PT3T_STATE *state = fe->demodulator_priv;
+	struct pt3t_state *state = fe->demodulator_priv;
 
 	if (re_tune) state->tune_state = PT3T_SET_FREQUENCY;
 
@@ -178,7 +178,6 @@ static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 				return 0;
 		}
 		state->tune_state = PT3T_TRACK;
-		// fall through
 
 	case PT3T_TRACK:
 		*delay = 3 * HZ;
@@ -193,11 +192,11 @@ static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 	BUG();
 }
 
-static DVB_FRONTEND_OPS pt3t_ops = {
+static struct dvb_frontend_ops pt3t_ops = {
 	.delsys = { SYS_ISDBT },
 	.info = {
 		.name = "PT3 ISDB-T",
-		.frequency_min = 1,//90000000,
+		.frequency_min = 1,
 		.frequency_max = 770000000,
 		.frequency_stepsize = 142857,
 		.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO | FE_CAN_QAM_AUTO |
@@ -212,15 +211,15 @@ static DVB_FRONTEND_OPS pt3t_ops = {
 	.tune = pt3t_tune,
 };
 
-DVB_FRONTEND *pt3t_attach(PT3_ADAPTER *adap)
+struct dvb_frontend *pt3t_attach(struct pt3_adapter *adap)
 {
-	DVB_FRONTEND *fe;
-	PT3T_STATE *state = kzalloc(sizeof(PT3T_STATE), GFP_KERNEL);
+	struct dvb_frontend *fe;
+	struct pt3t_state *state = kzalloc(sizeof(struct pt3t_state), GFP_KERNEL);
 
 	if (!state) return NULL;
 	state->adap = adap;
 	fe = &state->fe;
-	memcpy(&fe->ops, &pt3t_ops, sizeof(DVB_FRONTEND_OPS));
+	memcpy(&fe->ops, &pt3t_ops, sizeof(struct dvb_frontend_ops));
 	fe->demodulator_priv = state;
 	return fe;
 }

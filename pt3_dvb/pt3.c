@@ -8,7 +8,11 @@
 #include "pt3s.c"
 #include "pt3t.c"
 
-static int pt3_set_frequency(PT3_ADAPTER *adap, __u32 channel, __s32 offset)
+MODULE_AUTHOR("Budi Rachmanto <knightrider @ are.ma>");
+MODULE_DESCRIPTION("Earthsoft PT3 DVB Driver");
+MODULE_LICENSE("GPL");
+
+static int pt3_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset)
 {
 	int ret;
 
@@ -21,7 +25,7 @@ static int pt3_set_frequency(PT3_ADAPTER *adap, __u32 channel, __s32 offset)
 	return ret;
 }
 
-static int pt3_set_tuner_sleep(PT3_ADAPTER *adap, bool sleep)
+static int pt3_set_tuner_sleep(struct pt3_adapter *adap, bool sleep)
 {
 	int ret;
 
@@ -36,7 +40,7 @@ static int pt3_set_tuner_sleep(PT3_ADAPTER *adap, bool sleep)
 	return ret;
 }
 
-static int pt3_update_lnb(PT3_BOARD *pt3)
+static int pt3_update_lnb(struct pt3_board *pt3)
 {
 	u8 i, lnb_eff = 0;
 
@@ -45,7 +49,7 @@ static int pt3_update_lnb(PT3_BOARD *pt3)
 		pt3->reset = false;
 		pt3->lnb = 0;
 	} else {
-		PT3_ADAPTER *adap;
+		struct pt3_adapter *adap;
 		mutex_lock(&pt3->lock);
 		for (i = 0; i < PT3_NR_ADAPS; i++) {
 			adap = pt3->adap[i];
@@ -73,7 +77,7 @@ static int pt3_update_lnb(PT3_BOARD *pt3)
 int pt3_thread(void *data)
 {
 	size_t ret;
-	PT3_ADAPTER *adap = data;
+	struct pt3_adapter *adap = data;
 	loff_t ppos = 0;
 
 	set_freezable();
@@ -88,7 +92,7 @@ int pt3_thread(void *data)
 	return 0;
 }
 
-static int pt3_start_polling(PT3_ADAPTER *adap)
+static int pt3_start_polling(struct pt3_adapter *adap)
 {
 	int ret = 0;
 
@@ -99,7 +103,7 @@ static int pt3_start_polling(PT3_ADAPTER *adap)
 			ret = PTR_ERR(adap->kthread);
 			adap->kthread = NULL;
 		} else {
-			pt3_dma_set_test_mode(adap->dma, RESET, 0);	// reset_error_count
+			pt3_dma_set_test_mode(adap->dma, RESET, 0);
 			pt3_dma_set_enabled(adap->dma, true);
 		}
 	}
@@ -107,7 +111,7 @@ static int pt3_start_polling(PT3_ADAPTER *adap)
 	return ret;
 }
 
-static void pt3_stop_polling(PT3_ADAPTER *adap)
+static void pt3_stop_polling(struct pt3_adapter *adap)
 {
 	mutex_lock(&adap->lock);
 	if (adap->kthread) {
@@ -120,10 +124,10 @@ static void pt3_stop_polling(PT3_ADAPTER *adap)
 	mutex_unlock(&adap->lock);
 }
 
-static int pt3_start_feed(DVB_DEMUX_FEED *feed)
+static int pt3_start_feed(struct dvb_demux_feed *feed)
 {
 	int ret;
-	PT3_ADAPTER *adap = container_of(feed->demux, PT3_ADAPTER, demux);
+	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
 	if (!adap->users++) {
 		if (adap->in_use) {
 			PT3_PRINTK(KERN_DEBUG, "device is already used\n");
@@ -137,9 +141,9 @@ static int pt3_start_feed(DVB_DEMUX_FEED *feed)
 	return 0;
 }
 
-static int pt3_stop_feed(DVB_DEMUX_FEED *feed)
+static int pt3_stop_feed(struct dvb_demux_feed *feed)
 {
-	PT3_ADAPTER *adap = container_of(feed->demux, PT3_ADAPTER, demux);
+	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
 	if (!--adap->users) {
 		pt3_stop_polling(adap);
 		adap->in_use = false;
@@ -150,15 +154,15 @@ static int pt3_stop_feed(DVB_DEMUX_FEED *feed)
 
 DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 
-static PT3_ADAPTER *pt3_alloc_adapter(PT3_BOARD *pt3)
+static struct pt3_adapter *pt3_alloc_adapter(struct pt3_board *pt3)
 {
-	PT3_ADAPTER *adap;
-	DVB_ADAPTER *dvb;
-	DVB_DEMUX *demux;
-	DMXDEV *dmxdev;
+	struct pt3_adapter *adap;
+	struct dvb_adapter *dvb;
+	struct dvb_demux *demux;
+	struct dmxdev *dmxdev;
 	int ret;
 
-	if (!(adap = kzalloc(sizeof(PT3_ADAPTER), GFP_KERNEL))) {
+	if (!(adap = kzalloc(sizeof(struct pt3_adapter), GFP_KERNEL))) {
 		ret = -ENOMEM;
 		goto err;
 	}
@@ -203,14 +207,14 @@ err:
 	return ERR_PTR(ret);
 }
 
-static int pt3_tuner_init_s(PT3_I2C *i2c, PT3_ADAPTER *adap)
+static int pt3_tuner_init_s(struct pt3_i2c *i2c, struct pt3_adapter *adap)
 {
 	int ret;
-	PT3_BUS *bus;
+	struct pt3_bus *bus;
 
 	pt3_qm_init_reg_param(adap->qm);
 
-	if (!(bus = vzalloc(sizeof(PT3_BUS))))
+	if (!(bus = vzalloc(sizeof(struct pt3_bus))))
 		return -ENOMEM;
 	pt3_qm_dummy_reset(adap->qm, bus);
 	pt3_bus_end(bus);
@@ -221,7 +225,7 @@ static int pt3_tuner_init_s(PT3_I2C *i2c, PT3_ADAPTER *adap)
 		return ret;
 	}
 
-	if (!(bus = vzalloc(sizeof(PT3_BUS))))
+	if (!(bus = vzalloc(sizeof(struct pt3_bus))))
 		return -ENOMEM;
 	if ((ret = pt3_qm_init(adap->qm, bus))) {
 		vfree(bus);
@@ -237,10 +241,10 @@ static int pt3_tuner_init_s(PT3_I2C *i2c, PT3_ADAPTER *adap)
 	return ret;
 }
 
-static int pt3_tuner_power_on(PT3_BOARD *pt3, PT3_BUS *bus)
+static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 {
 	int ret, i, j;
-	PT3_TS_PINS_MODE pins;
+	struct pt3_ts_pins_mode pins;
 
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
 		ret = pt3_tc_init(pt3->adap[i]);
@@ -289,11 +293,11 @@ last:
 	return ret;
 }
 
-static int pt3_tuner_init_all(PT3_BOARD *pt3)
+static int pt3_tuner_init_all(struct pt3_board *pt3)
 {
 	int ret, i;
-	PT3_I2C *i2c = pt3->i2c;
-	PT3_BUS *bus = vzalloc(sizeof(PT3_BUS));
+	struct pt3_i2c *i2c = pt3->i2c;
+	struct pt3_bus *bus = vzalloc(sizeof(struct pt3_bus));
 
 	if (!bus) return -ENOMEM;
 	pt3_bus_end(bus);
@@ -310,7 +314,7 @@ static int pt3_tuner_init_all(PT3_BOARD *pt3)
 	PT3_PRINTK(KERN_DEBUG, "tuner_power_on\n");
 
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
-		PT3_ADAPTER *adap = pt3->adap[i];
+		struct pt3_adapter *adap = pt3->adap[i];
 		if ((ret = pt3_set_tuner_sleep(adap, false)))
 			goto last;
 		if ((ret = pt3_set_frequency(adap, adap->init_ch, 0)))
@@ -323,10 +327,10 @@ last:
 	return ret;
 }
 
-static void pt3_cleanup_adapters(PT3_BOARD *pt3)
+static void pt3_cleanup_adapters(struct pt3_board *pt3)
 {
 	int i;
-	PT3_ADAPTER *adap;
+	struct pt3_adapter *adap;
 	for (i = 0; i < PT3_NR_ADAPS; i++) if ((adap = pt3->adap[i])) {
 		if (adap->kthread) kthread_stop(adap->kthread);
 		if (adap->fe) dvb_unregister_frontend(adap->fe);
@@ -344,31 +348,31 @@ static void pt3_cleanup_adapters(PT3_BOARD *pt3)
 	}
 }
 
-static int pt3_fe_set_voltage(DVB_FRONTEND *fe, fe_sec_voltage_t voltage)
+static int pt3_fe_set_voltage(struct dvb_frontend *fe, fe_sec_voltage_t voltage)
 {
-	PT3_ADAPTER *adap = container_of(fe->dvb, PT3_ADAPTER, dvb);
+	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
 	adap->voltage = voltage;
 	return (adap->orig_voltage) ? adap->orig_voltage(fe, voltage) : 0;
 }
 
-static int pt3_fe_sleep(DVB_FRONTEND *fe)
+static int pt3_fe_sleep(struct dvb_frontend *fe)
 {
-	PT3_ADAPTER *adap = container_of(fe->dvb, PT3_ADAPTER, dvb);
+	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
 	adap->sleep = true;
 	pt3_update_lnb(adap->pt3);
 	return (adap->orig_sleep) ? adap->orig_sleep(fe) : 0;
 }
 
-static int pt3_fe_wakeup(DVB_FRONTEND *fe)
+static int pt3_fe_wakeup(struct dvb_frontend *fe)
 {
-	PT3_ADAPTER *adap = container_of(fe->dvb, PT3_ADAPTER, dvb);
+	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
 	adap->sleep = false;
 	pt3_update_lnb(adap->pt3);
 	PT3_WAIT_MS_UNINT(1);
 	return (adap->orig_init) ? adap->orig_init(fe) : 0;
 }
 
-static int pt3_init_frontend(PT3_ADAPTER *adap, DVB_FRONTEND *fe)
+static int pt3_init_frontend(struct pt3_adapter *adap, struct dvb_frontend *fe)
 {
 	int ret = 0;
 
@@ -383,9 +387,9 @@ static int pt3_init_frontend(PT3_ADAPTER *adap, DVB_FRONTEND *fe)
 	return ret;
 }
 
-static int pt3_init_frontends(PT3_BOARD *pt3)
+static int pt3_init_frontends(struct pt3_board *pt3)
 {
-	DVB_FRONTEND *fe[PT3_NR_ADAPS];
+	struct dvb_frontend *fe[PT3_NR_ADAPS];
 	int i, ret;
 
 	for (i = 0; i < PT3_NR_ADAPS; i++) if (pt3->adap[i]->type == SYS_ISDBS) {
@@ -408,7 +412,7 @@ static int pt3_init_frontends(PT3_BOARD *pt3)
 
 static void pt3_remove(struct pci_dev *pdev)
 {
-	PT3_BOARD *pt3 = pci_get_drvdata(pdev);
+	struct pt3_board *pt3 = pci_get_drvdata(pdev);
 
 	if (pt3) {
 		pt3->reset = true;
@@ -428,7 +432,7 @@ static void pt3_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 }
 
-static int pt3_abort(PCI_DEV *pdev, int ret, char *fmt, ...)
+static int pt3_abort(struct pci_dev *pdev, int ret, char *fmt, ...)
 {
 	va_list ap;
 	char *s = NULL;
@@ -447,8 +451,8 @@ static int pt3_abort(PCI_DEV *pdev, int ret, char *fmt, ...)
 
 static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
-	PT3_BOARD *pt3;
-	PT3_ADAPTER *adap;
+	struct pt3_board *pt3;
+	struct pt3_adapter *adap;
 	int i, ret;
 
 	int bars = pci_select_bars(pdev, IORESOURCE_MEM);
@@ -467,8 +471,8 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_set_master(pdev);
 	if ((ret = pci_save_state(pdev)))
 		return pt3_abort(pdev, ret, "Failed pci_save_state\n");
-	if (!(pt3 = kzalloc(sizeof(PT3_BOARD), GFP_KERNEL)))
-		return pt3_abort(pdev, -ENOMEM, "PT3_BOARD out of memory\n");
+	if (!(pt3 = kzalloc(sizeof(struct pt3_board), GFP_KERNEL)))
+		return pt3_abort(pdev, -ENOMEM, "struct pt3_board out of memory\n");
 
 	pt3->bars = bars;
 	pt3->pdev = pdev;
@@ -499,7 +503,7 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		adap->init_ch    = pt3_config[i].init_ch;
 		adap->str        = pt3_config[i].str;
 		if (adap->type == SYS_ISDBS) {
-			if (!(adap->qm = vzalloc(sizeof(PT3_QM))))
+			if (!(adap->qm = vzalloc(sizeof(struct pt3_qm))))
 				return pt3_abort(pdev, -ENOMEM, "QM out of memory\n");
 			adap->qm->adap = adap;
 		}
@@ -508,7 +512,7 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pt3->reset = true;
 	pt3_update_lnb(pt3);
 
-	if (!(pt3->i2c = vzalloc(sizeof(PT3_I2C))))
+	if (!(pt3->i2c = vzalloc(sizeof(struct pt3_i2c))))
 		return pt3_abort(pdev, -ENOMEM, "Cannot allocate I2C\n");
 	mutex_init(&pt3->i2c->lock);
 	pt3->i2c->reg[0] = pt3->reg[0];

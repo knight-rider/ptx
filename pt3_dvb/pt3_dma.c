@@ -6,33 +6,31 @@
 #define PT3_DMA_TS_BUF_SIZE	(PT3_DMA_BLOCK_SIZE * PT3_DMA_BLOCK_COUNT)
 #define PT3_DMA_NOT_SYNC_BYTE	0x74
 
-static void pt3_dma_link_descriptor(__u64 next_addr, __u8 *desc)
+static void pt3_dma_link_descriptor(u64 next_addr, u8 *desc)
 {
-	(*(__u64 *)(desc + 12)) = next_addr | 2;
+	(*(u64 *)(desc + 12)) = next_addr | 2;
 }
 
-static void pt3_dma_write_descriptor(__u64 ts_addr, __u32 size, __u64 next_addr, __u8 *desc)
+static void pt3_dma_write_descriptor(u64 ts_addr, u32 size, u64 next_addr, u8 *desc)
 {
-	(*(__u64 *)(desc +  0)) = ts_addr   | 7;
-	(*(__u32 *)(desc +  8)) = size      | 7;
-	(*(__u64 *)(desc + 12)) = next_addr | 2;
+	(*(u64 *)(desc +  0)) = ts_addr   | 7;
+	(*(u32 *)(desc +  8)) = size      | 7;
+	(*(u64 *)(desc + 12)) = next_addr | 2;
 }
 
-void pt3_dma_build_page_descriptor(PT3_DMA *dma, bool loop)
+void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 {
-	PT3_DMA_PAGE *desc_info, *ts_info;
-	__u64 ts_addr, desc_addr;
-	__u32 i, j, ts_size, desc_remain, ts_info_pos, desc_info_pos;
-	__u8 *prev, *curr;
+	struct pt3_dma_page *desc_info, *ts_info;
+	u64 ts_addr, desc_addr;
+	u32 i, j, ts_size, desc_remain, ts_info_pos, desc_info_pos;
+	u8 *prev, *curr;
 
 	if (unlikely(!dma)) {
 		PT3_PRINTK(KERN_ALERT, "dma build page descriptor needs DMA\n");
 		return;
 	}
-#if 0
-	PT3_PRINTK(KERN_DEBUG, "build page descriptor ts_count=%d ts_size=0x%x desc_count=%d desc_size=0x%x\n",
-			dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
-#endif
+	PT3_PRINTK(KERN_DEBUG, "#%d build page descriptor ts_count=%d ts_size=0x%x desc_count=%d desc_size=0x%x\n",
+		dma->adap->idx, dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
 	desc_info_pos = ts_info_pos = 0;
 	if (unlikely(!(desc_info = &dma->desc_info[desc_info_pos]))) {
 		PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate desc_info %d\n",
@@ -64,14 +62,12 @@ void pt3_dma_build_page_descriptor(PT3_DMA *dma, bool loop)
 		ts_addr = ts_info->addr;
 		ts_size = ts_info->size;
 		ts_info_pos++;
-		// PT3_PRINTK(KERN_DEBUG, "ts_info addr=0x%llx size=0x%x\n", ts_addr, ts_size);
-#if 1
+		PT3_PRINTK(KERN_DEBUG, "#%d ts_info addr=0x%llx size=0x%x\n", dma->adap->idx, ts_addr, ts_size);
 		if (unlikely(!ts_info)) {
 			PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate ts_info %d\n",
 					ts_info_pos);
 			return;
 		}
-#endif
 		for (j = 0; j < ts_size / PT3_DMA_PAGE_SIZE; j++) {
 			if (desc_remain < PT3_DMA_DESC_SIZE) {
 				if (unlikely(dma->desc_count <= desc_info_pos)) {
@@ -86,10 +82,8 @@ void pt3_dma_build_page_descriptor(PT3_DMA *dma, bool loop)
 							desc_info_pos);
 					return;
 				}
-				/*
-				PT3_PRINTK(KERN_DEBUG, "desc_info_pos=%d ts_addr=0x%llx remain=%d\n",
-						desc_info_pos, ts_addr, desc_remain);
-				*/
+				PT3_PRINTK(KERN_DEBUG, "#%d desc_info_pos=%d ts_addr=0x%llx remain=%d\n",
+					dma->adap->idx, desc_info_pos, ts_addr, desc_remain);
 				desc_addr = desc_info->addr;
 				desc_remain = desc_info->size;
 				desc_info_pos++;
@@ -98,10 +92,8 @@ void pt3_dma_build_page_descriptor(PT3_DMA *dma, bool loop)
 				pt3_dma_link_descriptor(desc_addr, prev);
 			}
 			pt3_dma_write_descriptor(ts_addr, PT3_DMA_PAGE_SIZE, 0, curr);
-#if 0
-			PT3_PRINTK(KERN_DEBUG, "dma write desc ts_addr=0x%llx desc_info_pos=%d\n",
-						ts_addr, desc_info_pos);
-#endif
+			PT3_PRINTK(KERN_DEBUG, "#%d dma write desc ts_addr=0x%llx desc_info_pos=%d\n",
+				dma->adap->idx, ts_addr, desc_info_pos);
 			ts_addr += PT3_DMA_PAGE_SIZE;
 
 			prev = curr;
@@ -124,10 +116,10 @@ void pt3_dma_build_page_descriptor(PT3_DMA *dma, bool loop)
 	}
 }
 
-void pt3_dma_free(PT3_DMA *dma)
+void pt3_dma_free(struct pt3_dma *dma)
 {
-	PT3_DMA_PAGE *page;
-	__u32 i;
+	struct pt3_dma_page *page;
+	u32 i;
 
 	if (dma->ts_info) {
 		for (i = 0; i < dma->ts_count; i++) {
@@ -148,12 +140,12 @@ void pt3_dma_free(PT3_DMA *dma)
 	kfree(dma);
 }
 
-PT3_DMA *pt3_dma_create(PT3_ADAPTER *adap)
+struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 {
-	PT3_DMA_PAGE *page;
-	__u32 i;
+	struct pt3_dma_page *page;
+	u32 i;
 
-	PT3_DMA *dma = kzalloc(sizeof(PT3_DMA), GFP_KERNEL);
+	struct pt3_dma *dma = kzalloc(sizeof(struct pt3_dma), GFP_KERNEL);
 	if (!dma) {
 		PT3_PRINTK(KERN_ALERT, "fail allocate PT3_DMA\n");
 		goto fail;
@@ -163,7 +155,7 @@ PT3_DMA *pt3_dma_create(PT3_ADAPTER *adap)
 	mutex_init(&dma->lock);
 
 	dma->ts_count = PT3_DMA_BLOCK_COUNT;
-	if (!(dma->ts_info = kzalloc(sizeof(PT3_DMA_PAGE) * dma->ts_count, GFP_KERNEL))) {
+	if (!(dma->ts_info = kzalloc(sizeof(struct pt3_dma_page) * dma->ts_count, GFP_KERNEL))) {
 		PT3_PRINTK(KERN_ALERT, "fail allocate PT3_DMA_PAGE\n");
 		goto fail;
 	}
@@ -179,7 +171,7 @@ PT3_DMA *pt3_dma_create(PT3_ADAPTER *adap)
 	PT3_PRINTK(KERN_DEBUG, "Allocate TS buffer.\n");
 
 	dma->desc_count = (PT3_DMA_TS_BUF_SIZE / (PT3_DMA_PAGE_SIZE) + PT3_DMA_MAX_DESCS - 1) / PT3_DMA_MAX_DESCS;
-	if (!(dma->desc_info = kzalloc(sizeof(PT3_DMA_PAGE) * dma->desc_count, GFP_KERNEL))) {
+	if (!(dma->desc_info = kzalloc(sizeof(struct pt3_dma_page) * dma->desc_count, GFP_KERNEL))) {
 		PT3_PRINTK(KERN_ALERT, "fail allocate PT3_DMA_PAGE\n");
 		goto fail;
 	}
@@ -203,15 +195,15 @@ fail:
 	return NULL;
 }
 
-void __iomem *pt3_dma_get_base_addr(PT3_DMA *dma)
+void __iomem *pt3_dma_get_base_addr(struct pt3_dma *dma)
 {
 	return dma->adap->pt3->i2c->reg[0] + REG_BASE + (0x18 * dma->adap->idx);
 }
 
-void pt3_dma_reset(PT3_DMA *dma)
+void pt3_dma_reset(struct pt3_dma *dma)
 {
-	PT3_DMA_PAGE *page;
-	__u32 i;
+	struct pt3_dma_page *page;
+	u32 i;
 
 	for (i = 0; i < dma->ts_count; i++) {
 		page = &dma->ts_info[i];
@@ -222,10 +214,10 @@ void pt3_dma_reset(PT3_DMA *dma)
 	dma->ts_pos = 0;
 }
 
-void pt3_dma_set_enabled(PT3_DMA *dma, bool enabled)
+void pt3_dma_set_enabled(struct pt3_dma *dma, bool enabled)
 {
 	void __iomem *base = pt3_dma_get_base_addr(dma);
-	__u64 start_addr = dma->desc_info->addr;
+	u64 start_addr = dma->desc_info->addr;
 
 	if (enabled) {
 		PT3_PRINTK(KERN_DEBUG, "#%d DMA enable start_addr=%llx\n", dma->adap->idx, start_addr);
@@ -250,9 +242,9 @@ void pt3_dma_set_enabled(PT3_DMA *dma, bool enabled)
 	dma->enabled = enabled;
 }
 
-static __u32 pt3_dma_gray2binary(__u32 gray, __u32 bit)
+static u32 pt3_dma_gray2binary(u32 gray, u32 bit)
 {
-	__u32 binary = 0, i, j, k;
+	u32 binary = 0, i, j, k;
 
 	for (i = 0; i < bit; i++) {
 		k = 0;
@@ -262,31 +254,31 @@ static __u32 pt3_dma_gray2binary(__u32 gray, __u32 bit)
 	return binary;
 }
 
-__u32 pt3_dma_get_ts_error_packet_count(PT3_DMA *dma)
+u32 pt3_dma_get_ts_error_packet_count(struct pt3_dma *dma)
 {
 	return pt3_dma_gray2binary(readl(pt3_dma_get_base_addr(dma) + REG_TS_ERR), 32);
 }
 
-typedef enum {
+enum pt3_dma_mode {
 	USE_LFSR = 1 << 16,
 	REVERSE  = 1 << 17,
 	RESET    = 1 << 18,
-} PT3_DMA_MODE;
+};
 
-void pt3_dma_set_test_mode(PT3_DMA *dma, PT3_DMA_MODE mode, __u16 initval)
+void pt3_dma_set_test_mode(struct pt3_dma *dma, enum pt3_dma_mode mode, u16 initval)
 {
 	void __iomem *base = pt3_dma_get_base_addr(dma);
-	__u32 data = mode | initval;
+	u32 data = mode | initval;
 	PT3_PRINTK(KERN_DEBUG, "set_test_mode base=%p data=0x%04x\n", base, data);
 	writel(data, base + REG_TS_CTL);
 }
 
-bool pt3_dma_ready(PT3_DMA *dma)
+bool pt3_dma_ready(struct pt3_dma *dma)
 {
-	PT3_DMA_PAGE *page;
-	__u8 *p;
+	struct pt3_dma_page *page;
+	u8 *p;
 
-	__u32 next = dma->ts_pos + 1;
+	u32 next = dma->ts_pos + 1;
 	if (next >= dma->ts_count)
 		next = 0;
 	page = &dma->ts_info[next];
@@ -302,11 +294,11 @@ bool pt3_dma_ready(PT3_DMA *dma)
 	return false;
 }
 
-ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, loff_t *ppos)
+ssize_t pt3_dma_copy(struct pt3_dma *dma, struct dvb_demux *demux, loff_t *ppos)
 {
 	bool ready;
-	PT3_DMA_PAGE *page;
-	__u32 i, prev;
+	struct pt3_dma_page *page;
+	u32 i, prev;
 	size_t csize, remain = dma->ts_info[dma->ts_pos].size;
 
 	mutex_lock(&dma->lock);
@@ -332,7 +324,7 @@ ssize_t pt3_dma_copy(PT3_DMA *dma, DVB_DEMUX *demux, loff_t *ppos)
 		for (;;) {
 			csize = (remain < (page->size - page->data_pos)) ?
 				remain : (page->size - page->data_pos);
-			dvb_dmx_swfilter(demux, &page->data[page->data_pos], csize); // is this OK???
+			dvb_dmx_swfilter(demux, &page->data[page->data_pos], csize);
 			*ppos += csize;
 			remain -= csize;
 			page->data_pos += csize;
@@ -353,7 +345,7 @@ last:
 	return dma->ts_info[dma->ts_pos].size - remain;
 }
 
-__u32 pt3_dma_get_status(PT3_DMA *dma)
+u32 pt3_dma_get_status(struct pt3_dma *dma)
 {
 	return readl(pt3_dma_get_base_addr(dma) + REG_STATUS);
 }
