@@ -74,7 +74,7 @@ static int pt3t_get_tmcc(PT3_ADAPTER *adap, TMCC_T *tmcc)
 			if (retryov)
 				break;
 		}
-		PT3_WAIT_MS_INT(1);	
+		PT3_WAIT_MS_INT(1);
 	}
 	if (likely(b))
 		pt3_tc_read_tmcc_t(adap, NULL, tmcc);
@@ -175,7 +175,7 @@ static int pt3t_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 			PT3_PRINTK(KERN_ALERT, "#%d fail get_tmcc_t ret=%d\n", state->adap->idx, ret);
 				state->tune_state = PT3T_ABORT;
 				*delay = 3 * HZ;
-				return 0;				
+				return 0;
 		}
 		state->tune_state = PT3T_TRACK;
 		// fall through

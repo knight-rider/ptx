@@ -308,7 +308,7 @@ static int pt3_tuner_init_all(PT3_BOARD *pt3)
 	if ((ret = pt3_tuner_power_on(pt3, bus)))
 		goto last;
 	PT3_PRINTK(KERN_DEBUG, "tuner_power_on\n");
-	
+
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
 		PT3_ADAPTER *adap = pt3->adap[i];
 		if ((ret = pt3_set_tuner_sleep(adap, false)))
@@ -391,7 +391,7 @@ static int pt3_init_frontends(PT3_BOARD *pt3)
 	for (i = 0; i < PT3_NR_ADAPS; i++) if (pt3->adap[i]->type == SYS_ISDBS) {
 		if (!(fe[i] = pt3s_attach(pt3->adap[i]))) break;
 	} else {
-		if (!(fe[i] = pt3t_attach(pt3->adap[i]))) break;		
+		if (!(fe[i] = pt3t_attach(pt3->adap[i]))) break;
 	}
 	if (i < PT3_NR_ADAPS) {
 		while (i--) fe[i]->ops.release(fe[i]);

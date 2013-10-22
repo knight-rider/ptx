@@ -13,7 +13,7 @@ void pt3_i2c_reset(PT3_I2C *i2c)
 static void pt3_i2c_wait(PT3_I2C *i2c, __u32 *data)
 {
 	__u32 val;
-	
+
 	while (1) {
 		val = readl(i2c->reg[0] + REG_I2C_R);
 		if (!PT3_SHIFT_MASK(val, 0, 1))	break;

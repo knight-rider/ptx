@@ -34,7 +34,7 @@ void pt3_qm_dummy_reset(PT3_QM *qm, PT3_BUS *bus)
 static void pt3_qm_sleep(PT3_BUS *bus, __u32 ms)
 {
 	if (bus) pt3_bus_sleep(bus, ms);
-	else PT3_WAIT_MS_INT(ms);	
+	else PT3_WAIT_MS_INT(ms);
 }
 
 static int pt3_qm_read(PT3_QM *qm, PT3_BUS *bus, __u8 addr, __u8 *data)
@@ -361,7 +361,7 @@ int pt3_qm_set_frequency(PT3_QM *qm, __u32 channel)
 			break;
 		if (pt3_tc_time_diff(&begin, &now) >= 100)
 			break;
-		PT3_WAIT_MS_INT(1);	
+		PT3_WAIT_MS_INT(1);
 	}
 	// PT3_PRINTK(KERN_DEBUG, "qm_get_locked %d ret=0x%x\n", locked, ret);
 	if (!locked)

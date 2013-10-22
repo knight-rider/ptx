@@ -116,7 +116,7 @@ static int pt3s_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 	int i, ret,
 	    freq = state->fe.dtv_property_cache.frequency,
 	    tsid = state->fe.dtv_property_cache.stream_id,
- 	    ch = (freq < 1024) ? freq : pt3s_get_channel(freq); // consider as freqno if freq is low
+	    ch = (freq < 1024) ? freq : pt3s_get_channel(freq); // consider as freqno if freq is low
 
 	if (re_tune) state->tune_state = PT3S_SET_FREQUENCY;
 
@@ -161,7 +161,7 @@ static int pt3s_tune(DVB_FRONTEND *fe, bool re_tune, unsigned int mode_flags, un
 			PT3_PRINTK(KERN_DEBUG, "tsid %x i %d tmcc->id %x\n", tsid, i, tmcc->id[i]);
 			if (tmcc->id[i] == tsid) break;
 		}
- 		if (tsid < sizeof(tmcc->id)/sizeof(tmcc->id[0])) i = tsid; // consider as slot#
+		if (tsid < sizeof(tmcc->id)/sizeof(tmcc->id[0])) i = tsid; // consider as slot#
 		if (i == sizeof(tmcc->id)/sizeof(tmcc->id[0])) {
 			PT3_PRINTK(KERN_ALERT, "#%d i%d tsid 0x%x not found\n", adap->idx, i, tsid);
 			return -EINVAL;
