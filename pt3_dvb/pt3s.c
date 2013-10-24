@@ -40,7 +40,7 @@ static int pt3s_read_snr(struct dvb_frontend *fe, u16 *snr)
 	y -= (s64)x5 * ((16346ll << 30) / 10000) >> 28;
 
 	*snr = y < 0 ? 0 : y >> 15;
-	PT3_PRINTK(KERN_INFO, "#%d cn=%d s/n=%d\n", adap->idx, cn, *snr);
+	pr_debug("#%d cn=%d s/n=%d\n", adap->idx, cn, *snr);
 	return 0;
 }
 
@@ -130,7 +130,7 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 		return 0;
 
 	case PT3S_SET_FREQUENCY:
-		PT3_PRINTK(KERN_DEBUG, "#%d freq %d tsid 0x%x ch %d\n", adap->idx, freq, tsid, ch);
+		pr_debug("#%d freq %d tsid 0x%x ch %d\n", adap->idx, freq, tsid, ch);
 		ret = pt3_qm_set_frequency(adap->qm, ch);
 		if (ret)
 			return ret;
@@ -148,10 +148,10 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 			msleep_interruptible(1);
 		}
 		if (ret) {
-			PT3_PRINTK(KERN_ALERT, "fail tc_read_tmcc_s ret=0x%x\n", ret);
+			pr_debug("fail tc_read_tmcc_s ret=0x%x\n", ret);
 			return ret;
 		}
-		PT3_PRINTK(KERN_DEBUG, "slots=%d,%d,%d,%d mode=%d,%d,%d,%d\n",
+		pr_debug("slots=%d,%d,%d,%d mode=%d,%d,%d,%d\n",
 				tmcc->slot[0], tmcc->slot[1], tmcc->slot[2], tmcc->slot[3],
 				tmcc->mode[0], tmcc->mode[1], tmcc->mode[2], tmcc->mode[3]);
 		state->tune_state = PT3S_CHECK_MODULATION;
@@ -160,22 +160,22 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 		return 0;
 
 	case PT3S_CHECK_MODULATION:
-		PT3_PRINTK(KERN_DEBUG, "tmcc->id=0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x\n",
+		pr_debug("tmcc->id=0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x\n",
 				tmcc->id[0], tmcc->id[1], tmcc->id[2], tmcc->id[3],
 				tmcc->id[4], tmcc->id[5], tmcc->id[6], tmcc->id[7]);
 		for (i = 0; i < sizeof(tmcc->id)/sizeof(tmcc->id[0]); i++) {
-			PT3_PRINTK(KERN_DEBUG, "tsid %x i %d tmcc->id %x\n", tsid, i, tmcc->id[i]);
+			pr_debug("tsid %x i %d tmcc->id %x\n", tsid, i, tmcc->id[i]);
 			if (tmcc->id[i] == tsid)
 				break;
 		}
 		if (tsid < sizeof(tmcc->id)/sizeof(tmcc->id[0]))	/* consider as slot# */
 			i = tsid;
 		if (i == sizeof(tmcc->id)/sizeof(tmcc->id[0])) {
-			PT3_PRINTK(KERN_ALERT, "#%d i%d tsid 0x%x not found\n", adap->idx, i, tsid);
+			pr_debug("#%d i%d tsid 0x%x not found\n", adap->idx, i, tsid);
 			return -EINVAL;
 		}
 		adap->offset = i;
-		PT3_PRINTK(KERN_INFO, "#%d found tsid 0x%x on slot %d\n", adap->idx, tsid, i);
+		pr_debug("#%d found tsid 0x%x on slot %d\n", adap->idx, tsid, i);
 		state->tune_state = PT3S_SET_TS_ID;
 		*delay = 0;
 		*status = FE_HAS_SIGNAL | FE_HAS_CARRIER;
@@ -184,7 +184,7 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 	case PT3S_SET_TS_ID:
 		ret = pt3_tc_write_id_s(adap, NULL, (u16)tmcc->id[adap->offset]);
 		if (ret) {
-			PT3_PRINTK(KERN_ALERT, "fail set_tmcc_s ret=%d\n", ret);
+			pr_debug("fail set_tmcc_s ret=%d\n", ret);
 			return ret;
 		}
 		state->tune_state = PT3S_CHECK_TS_ID;
@@ -195,11 +195,11 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 			u16 short_id;
 			ret = pt3_tc_read_id_s(adap, NULL, &short_id);
 			if (ret) {
-				PT3_PRINTK(KERN_ERR, "fail get_id_s ret=%d\n", ret);
+				pr_debug("fail get_id_s ret=%d\n", ret);
 				return ret;
 			}
 			tsid = short_id;
-			PT3_PRINTK(KERN_DEBUG, "#%d tsid=0x%x\n", adap->idx, tsid);
+			pr_debug("#%d tsid=0x%x\n", adap->idx, tsid);
 			if ((tsid & 0xffff) == tmcc->id[adap->offset])
 				break;
 			msleep_interruptible(1);

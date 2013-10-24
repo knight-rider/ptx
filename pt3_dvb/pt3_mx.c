@@ -73,7 +73,7 @@ static void pt3_mx_rftune(u8 *data, u32 *size, u32 freq)
 	memcpy(data, rf_data, sizeof(rf_data));
 	*size = sizeof(rf_data);
 
-	PT3_PRINTK(KERN_DEBUG, "mx_rftune freq=%d\n", freq);
+	pr_debug("mx_rftune freq=%d\n", freq);
 }
 
 static void pt3_mx_write(struct pt3_adapter *adap, struct pt3_bus *bus, u8 *data, size_t size)
@@ -117,7 +117,7 @@ static void pt3_mx_tuner_rftune(struct pt3_adapter *adap, struct pt3_bus *bus, u
 	adap->freq = freq;
 	pt3_mx_rftune(data, &size, freq);
 	if (size != 20) {
-		PT3_PRINTK(KERN_ALERT, "fail mx_rftune size = %d\n", size);
+		pr_debug("fail mx_rftune size = %d\n", size);
 		return;
 	}
 	pt3_mx_write(adap, bus, data, 14);
@@ -264,7 +264,7 @@ bool pt3_mx_locked(struct pt3_adapter *adap)
 			break;
 		msleep_interruptible(1);
 	}
-	PT3_PRINTK(KERN_DEBUG, "#%d mx locked1=%d locked2=%d\n", adap->idx, locked1, locked2);
+	pr_debug("#%d mx locked1=%d locked2=%d\n", adap->idx, locked1, locked2);
 	return locked1 && locked2;
 }
 
@@ -277,7 +277,7 @@ int pt3_mx_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset)
 	if (ret)
 		return ret;
 	pt3_mx_get_channel_frequency(adap, channel, &catv, &number, &freq);
-	PT3_PRINTK(KERN_DEBUG, "#%d ch%d%s no%d %dHz\n", adap->idx, channel, catv ? " CATV" : "", number, freq);
+	pr_debug("#%d ch%d%s no%d %dHz\n", adap->idx, channel, catv ? " CATV" : "", number, freq);
 	/* real_freq = (7 * freq + 1 + offset) * 1000000.0/7.0; */
 	real_freq = RF_TABLE[channel];
 

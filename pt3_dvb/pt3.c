@@ -16,7 +16,7 @@ static int pt3_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset)
 {
 	int ret;
 
-	PT3_PRINTK(KERN_DEBUG, "#%d %s set_freq channel=%d offset=%d\n", adap->idx, adap->str, channel, offset);
+	pr_debug("#%d %s set_freq channel=%d offset=%d\n", adap->idx, adap->str, channel, offset);
 
 	if (adap->type == SYS_ISDBS)
 		ret = pt3_qm_set_frequency(adap->qm, channel);
@@ -29,7 +29,7 @@ static int pt3_set_tuner_sleep(struct pt3_adapter *adap, bool sleep)
 {
 	int ret;
 
-	PT3_PRINTK(KERN_INFO, "#%d %p %s %s\n", adap->idx, adap, adap->str, sleep ? "Sleep" : "Wakeup");
+	pr_debug("#%d %p %s %s\n", adap->idx, adap, adap->str, sleep ? "Sleep" : "Wakeup");
 
 	if (adap->type == SYS_ISDBS)
 		ret = pt3_qm_set_sleep(adap->qm, sleep);
@@ -52,7 +52,7 @@ static int pt3_update_lnb(struct pt3_board *pt3)
 		mutex_lock(&pt3->lock);
 		for (i = 0; i < PT3_NR_ADAPS; i++) {
 			adap = pt3->adap[i];
-			PT3_PRINTK(KERN_DEBUG, "#%d in_use %d sleep %d\n", adap->idx, adap->in_use, adap->sleep);
+			pr_debug("#%d in_use %d sleep %d\n", adap->idx, adap->in_use, adap->sleep);
 			if ((adap->type == SYS_ISDBS) && (!adap->sleep)) {
 				lnb_eff |= adap->voltage == SEC_VOLTAGE_13 ? 1
 					:  adap->voltage == SEC_VOLTAGE_18 ? 2
@@ -61,7 +61,7 @@ static int pt3_update_lnb(struct pt3_board *pt3)
 		}
 		mutex_unlock(&pt3->lock);
 		if (unlikely(lnb_eff < 0 || 2 < lnb_eff)) {
-			PT3_PRINTK(KERN_ALERT, "Inconsistent LNB settings\n");
+			pr_debug("Inconsistent LNB settings\n");
 			return -EINVAL;
 		}
 		if (pt3->lnb != lnb_eff) {
@@ -69,7 +69,7 @@ static int pt3_update_lnb(struct pt3_board *pt3)
 			pt3->lnb = lnb_eff;
 		}
 	}
-	PT3_PRINTK(KERN_INFO, "LNB=%s\n", pt3_lnb[lnb_eff].str);
+	pr_debug("LNB=%s\n", pt3_lnb[lnb_eff].str);
 	return 0;
 }
 
@@ -85,7 +85,7 @@ int pt3_thread(void *data)
 		while ((ret = pt3_dma_copy(adap->dma, &adap->demux, &ppos)) > 0)
 			;
 		if (ret < 0) {
-			PT3_PRINTK(KERN_INFO, "#%d fail dma_copy\n", adap->idx);
+			pr_debug("#%d fail dma_copy\n", adap->idx);
 			msleep_interruptible(1);
 		}
 	}
@@ -116,7 +116,7 @@ static void pt3_stop_polling(struct pt3_adapter *adap)
 	mutex_lock(&adap->lock);
 	if (adap->kthread) {
 		pt3_dma_set_enabled(adap->dma, false);
-		PT3_PRINTK(KERN_INFO, "#%d DMA ts_err packet cnt %d\n",
+		pr_debug("#%d DMA ts_err packet cnt %d\n",
 			adap->idx, pt3_dma_get_ts_error_packet_count(adap->dma));
 		kthread_stop(adap->kthread);
 		adap->kthread = NULL;
@@ -130,10 +130,10 @@ static int pt3_start_feed(struct dvb_demux_feed *feed)
 	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
 	if (!adap->users++) {
 		if (adap->in_use) {
-			PT3_PRINTK(KERN_DEBUG, "device is already used\n");
+			pr_debug("device is already used\n");
 			return -EIO;
 		}
-		PT3_PRINTK(KERN_DEBUG, "#%d %s selected, DMA %s\n",
+		pr_debug("#%d %s selected, DMA %s\n",
 			adap->idx, adap->str, pt3_dma_get_status(adap->dma) & 1 ? "ON" : "OFF");
 		adap->in_use = true;
 		ret = pt3_start_polling(adap);
@@ -223,7 +223,7 @@ static int pt3_tuner_init_s(struct pt3_i2c *i2c, struct pt3_adapter *adap)
 	ret = pt3_i2c_run(i2c, bus, true);
 	vfree(bus);
 	if (ret) {
-		PT3_PRINTK(KERN_DEBUG, "fail pt3_tuner_init_s dummy reset ret=%d\n", ret);
+		pr_debug("fail pt3_tuner_init_s dummy reset ret=%d\n", ret);
 		return ret;
 	}
 
@@ -239,7 +239,7 @@ static int pt3_tuner_init_s(struct pt3_i2c *i2c, struct pt3_adapter *adap)
 	ret = pt3_i2c_run(i2c, bus, true);
 	vfree(bus);
 	if (ret) {
-		PT3_PRINTK(KERN_DEBUG, "fail pt3_tuner_init_s qm init ret=%d\n", ret);
+		pr_debug("fail pt3_tuner_init_s qm init ret=%d\n", ret);
 		return ret;
 	}
 	return ret;
@@ -252,11 +252,11 @@ static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
 		ret = pt3_tc_init(pt3->adap[i]);
-		PT3_PRINTK(KERN_INFO, "#%d tc_init ret=%d\n", i, ret);
+		pr_debug("#%d tc_init ret=%d\n", i, ret);
 	}
 	ret = pt3_tc_set_powers(pt3->adap[PT3_NR_ADAPS-1], NULL, true, false);
 	if (ret) {
-		PT3_PRINTK(KERN_DEBUG, "fail set powers.\n");
+		pr_debug("fail set powers.\n");
 		goto last;
 	}
 
@@ -267,7 +267,7 @@ static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
 		ret = pt3_tc_set_ts_pins_mode(pt3->adap[i], &pins);
 		if (ret)
-			PT3_PRINTK(KERN_INFO, "#%d %s fail set ts pins mode ret=%d\n", i, pt3->adap[i]->str, ret);
+			pr_debug("#%d %s fail set ts pins mode ret=%d\n", i, pt3->adap[i]->str, ret);
 	}
 	msleep_interruptible(1);
 
@@ -275,14 +275,14 @@ static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 		if (pt3->adap[i]->type == SYS_ISDBS) {
 			for (j = 0; j < 10; j++) {
 				if (j)
-					PT3_PRINTK(KERN_INFO, "retry pt3_tuner_init_s\n");
+					pr_debug("retry pt3_tuner_init_s\n");
 				ret = pt3_tuner_init_s(pt3->i2c, pt3->adap[i]);
 				if (!ret)
 					break;
 				msleep_interruptible(1);
 			}
 			if (ret) {
-				PT3_PRINTK(KERN_INFO, "fail pt3_tuner_init_s %d ret=0x%x\n", i, ret);
+				pr_debug("fail pt3_tuner_init_s %d ret=0x%x\n", i, ret);
 				goto last;
 			}
 		}
@@ -292,12 +292,12 @@ static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 	bus->cmd_addr = PT3_BUS_CMD_ADDR1;
 	ret = pt3_i2c_run(pt3->i2c, bus, false);
 	if (ret) {
-		PT3_PRINTK(KERN_INFO, "failed cmd_addr=0x%x ret=0x%x\n", PT3_BUS_CMD_ADDR1, ret);
+		pr_debug("failed cmd_addr=0x%x ret=0x%x\n", PT3_BUS_CMD_ADDR1, ret);
 		goto last;
 	}
 	ret = pt3_tc_set_powers(pt3->adap[PT3_NR_ADAPS-1], NULL, true, true);
 	if (ret) {
-		PT3_PRINTK(KERN_INFO, "fail tc_set_powers,\n");
+		pr_debug("fail tc_set_powers,\n");
 		goto last;
 	}
 last:
@@ -316,7 +316,7 @@ static int pt3_tuner_init_all(struct pt3_board *pt3)
 	bus->cmd_addr = PT3_BUS_CMD_ADDR0;
 
 	if (!pt3_i2c_is_clean(i2c)) {
-		PT3_PRINTK(KERN_INFO, "cleanup I2C bus\n");
+		pr_debug("cleanup I2C bus\n");
 		ret = pt3_i2c_run(i2c, bus, false);
 		if (ret)
 			goto last;
@@ -325,7 +325,7 @@ static int pt3_tuner_init_all(struct pt3_board *pt3)
 	ret = pt3_tuner_power_on(pt3, bus);
 	if (ret)
 		goto last;
-	PT3_PRINTK(KERN_DEBUG, "tuner_power_on\n");
+	pr_debug("tuner_power_on\n");
 
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
 		struct pt3_adapter *adap = pt3->adap[i];
@@ -334,7 +334,7 @@ static int pt3_tuner_init_all(struct pt3_board *pt3)
 			goto last;
 		ret = pt3_set_frequency(adap, adap->init_ch, 0);
 		if (ret)
-			PT3_PRINTK(KERN_DEBUG, "fail set_frequency, ret=%d\n", ret);
+			pr_debug("fail set_frequency, ret=%d\n", ret);
 		ret = pt3_set_tuner_sleep(adap, true);
 		if (ret)
 			goto last;

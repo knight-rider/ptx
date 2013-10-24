@@ -5,7 +5,7 @@ int pt3_tc_write(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, const u
 	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 
 	if (!p) {
-		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
+		pr_debug("out of memory.\n");
 		return -ENOMEM;
 	}
 
@@ -40,7 +40,7 @@ int pt3_tc_init(struct pt3_adapter *adap)
 {
 	u8 buf = 0x10;
 
-	PT3_PRINTK(KERN_INFO, "#%d %s tuner=0x%x tc=0x%x\n", adap->idx, adap->str, adap->addr_tuner, adap->addr_tc);
+	pr_debug("#%d %s tuner=0x%x tc=0x%x\n", adap->idx, adap->str, adap->addr_tuner, adap->addr_tc);
 	if (adap->type == SYS_ISDBS) {
 		int ret = pt3_tc_write_pskmsrst(adap);
 		return ret ? ret : pt3_tc_write(adap, NULL, 0x1e, &buf, 1);
@@ -55,7 +55,7 @@ int pt3_tc_set_powers(struct pt3_adapter *adap, struct pt3_bus *bus, bool tuner,
 	u8	tuner_power = tuner ? 0x03 : 0x02,
 		amp_power = amp ? 0x03 : 0x02,
 		data = (tuner_power << 6) | (0x01 << 4) | (amp_power << 2) | 0x01 << 0;
-	PT3_PRINTK(KERN_DEBUG, "#%d tuner %s amp %s\n", adap->idx, tuner ? "ON" : "OFF", amp ? "ON" : "OFF");
+	pr_debug("#%d tuner %s amp %s\n", adap->idx, tuner ? "ON" : "OFF", amp ? "ON" : "OFF");
 	return pt3_tc_write(adap, bus, 0x1e, &data, 1);
 }
 
@@ -92,7 +92,7 @@ int pt3_tc_write_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, c
 	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 
 	if (!p) {
-		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
+		pr_debug("out of memory.\n");
 		return -ENOMEM;
 	}
 
@@ -123,7 +123,7 @@ int pt3_tc_read_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8
 
 	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 	if (!p) {
-		PT3_PRINTK(KERN_ALERT, "#%d tc_read_tuner out of memory\n", adap->idx);
+		pr_debug("#%d tc_read_tuner out of memory\n", adap->idx);
 		return -ENOMEM;
 	}
 
@@ -156,7 +156,7 @@ int pt3_tc_read_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8
 		data[0] = pt3_bus_data1(p, rindex);
 		vfree(p);
 	}
-	PT3_PRINTK(KERN_DEBUG, "#%d read_tuner addr_tc=0x%x addr_tuner=0x%x\n",
+	pr_debug("#%d read_tuner addr_tc=0x%x addr_tuner=0x%x\n",
 		   adap->idx, adap->addr_tc, adap->addr_tuner);
 	return ret;
 }
@@ -213,7 +213,7 @@ int pt3_tc_write_tuner_without_addr(struct pt3_adapter *adap, struct pt3_bus *bu
 	u8 buf;
 	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 	if (!p) {
-		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
+		pr_debug("out of memory.\n");
 		return -ENOMEM;
 	}
 
@@ -244,7 +244,7 @@ int pt3_tc_write_sleep_time(struct pt3_adapter *adap, int sleep)
 u32 pt3_tc_time_diff(struct timeval *st, struct timeval *et)
 {
 	u32 diff = ((et->tv_sec - st->tv_sec) * 1000000 + (et->tv_usec - st->tv_usec)) / 1000;
-	PT3_PRINTK(KERN_DEBUG, "time diff = %d\n", diff);
+	pr_debug("time diff = %d\n", diff);
 	return diff;
 }
 
@@ -256,7 +256,7 @@ int pt3_tc_read_tuner_without_addr(struct pt3_adapter *adap, struct pt3_bus *bus
 	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 
 	if (!p) {
-		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
+		pr_debug("out of memory.\n");
 		return -ENOMEM;
 	}
 
@@ -280,7 +280,7 @@ int pt3_tc_read_tuner_without_addr(struct pt3_adapter *adap, struct pt3_bus *bus
 		data[0] = pt3_bus_data1(p, rindex);
 		vfree(p);
 	}
-	PT3_PRINTK(KERN_DEBUG, "#%d read_tuner_without addr_tc=0x%x addr_tuner=0x%x\n",
+	pr_debug("#%d read_tuner_without addr_tc=0x%x addr_tuner=0x%x\n",
 		adap->idx, adap->addr_tc, adap->addr_tuner);
 	return ret;
 }
@@ -292,7 +292,7 @@ static int pt3_tc_read(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u
 	u32 i, rindex;
 	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
 	if (!p) {
-		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
+		pr_debug("out of memory.\n");
 		return -ENOMEM;
 	}
 

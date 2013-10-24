@@ -1,6 +1,8 @@
 #ifndef	__PT3_H__
 #define	__PT3_H__
 
+#define pr_fmt(fmt) KBUILD_MODNAME " " fmt
+
 #include <linux/pci.h>
 #include <linux/kthread.h>
 #include <linux/freezer.h>
@@ -20,11 +22,11 @@
 #define REG_BUS		0x04	/*	R	Bus		*/
 #define REG_SYSTEM_W	0x08	/*	W	System		*/
 #define REG_SYSTEM_R	0x0c	/*	R	System		*/
-#define REG_I2C_W	0x10	/*	W	I2C		*/
-#define REG_I2C_R	0x14	/*	R	I2C		*/
-#define REG_RAM_W	0x18	/*	W	RAM		*/
-#define REG_RAM_R	0x1c	/*	R	RAM		*/
-#define REG_BASE	0x40	/* + 0x18*idx			*/
+#define REG_I2C_W 	0x10	/*	W	I2C		*/
+#define REG_I2C_R 	0x14	/*	R	I2C		*/
+#define REG_RAM_W 	0x18	/*	W	RAM		*/
+#define REG_RAM_R 	0x1c	/*	R	RAM		*/
+#define REG_BASE  	0x40	/* + 0x18*idx			*/
 #define REG_DMA_DESC_L	0x00	/*	W	DMA		*/
 #define REG_DMA_DESC_H	0x04	/*	W	DMA		*/
 #define REG_DMA_CTL	0x08	/*	W	DMA		*/
@@ -32,16 +34,9 @@
 #define REG_STATUS	0x10	/*	R	DMA/FIFO/TS	*/
 #define REG_TS_ERR	0x14	/*	R	TS		*/
 
-#define PT3_PRINTK(level, fmt, args...)\
-	{ if (debug + 48 >= level[1]) printk(DRV_NAME " " level " " fmt, ##args); }
-
-static int lnb = 2;	/* used if frontend does not set/the value is invalid */
+static int lnb = 2;	/* used if not set by frontend / the value is invalid */
 module_param(lnb, int, 0);
 MODULE_PARM_DESC(lnb, "LNB level (0:OFF 1:+11V 2:+15V)");
-
-int debug = 0;
-module_param(debug, int, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(debug, "debug level (0-7)");
 
 static DEFINE_PCI_DEVICE_TABLE(pt3_id_table) = {
 	{ PCI_DEVICE(ID_VEN_ALTERA, ID_DEV_PT3) },
@@ -151,8 +146,8 @@ struct pt3_adapter {
 	struct dmxdev dmxdev;
 	struct dvb_frontend *fe;
 	int (*orig_voltage)(struct dvb_frontend *fe, fe_sec_voltage_t voltage);
-	int (*orig_sleep)(struct dvb_frontend *fe);
-	int (*orig_init)(struct dvb_frontend *fe);
+	int (*orig_sleep  )(struct dvb_frontend *fe                          );
+	int (*orig_init   )(struct dvb_frontend *fe                          );
 	fe_sec_voltage_t voltage;
 };
 

@@ -349,7 +349,7 @@ int pt3_qm_set_frequency(struct pt3_qm *qm, u32 channel)
 	else
 		freq_kHz += 500;
 	qm->adap->freq = freq_kHz;
-	PT3_PRINTK(KERN_DEBUG, "#%d ch %d freq %d kHz\n", qm->adap->idx, channel, freq_kHz);
+	pr_debug("#%d ch %d freq %d kHz\n", qm->adap->idx, channel, freq_kHz);
 
 	ret = pt3_qm_local_lpf_tuning(qm, NULL, 1, channel);
 	if (ret)
@@ -366,7 +366,7 @@ int pt3_qm_set_frequency(struct pt3_qm *qm, u32 channel)
 			break;
 		msleep_interruptible(1);
 	}
-	PT3_PRINTK(KERN_DEBUG, "#%d qm_get_locked %d ret=0x%x\n", qm->adap->idx, locked, ret);
+	pr_debug("#%d qm_get_locked %d ret=0x%x\n", qm->adap->idx, locked, ret);
 	if (!locked)
 		return -ETIMEDOUT;
 

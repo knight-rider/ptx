@@ -45,13 +45,13 @@ int pt3_i2c_run(struct pt3_i2c *i2c, struct pt3_bus *bus, bool copy)
 
 	pt3_i2c_wait(i2c, &data);
 	if (unlikely(start_addr >= (1 << 13)))
-		PT3_PRINTK(KERN_DEBUG, "start address is over.\n");
+		pr_debug("start address is over.\n");
 	writel(1 << 16 | start_addr, i2c->reg[0] + REG_I2C_W);
 	pt3_i2c_wait(i2c, &data);
 
 	a = PT3_SHIFT_MASK(data, 1, 2);
 	if (a) {
-		PT3_PRINTK(KERN_DEBUG, "fail i2c run_code ret=0x%x\n", data);
+		pr_debug("fail i2c run_code ret=0x%x\n", data);
 		ret = -EIO;
 	}
 	for (i = 0; i < bus->read_addr; i++)

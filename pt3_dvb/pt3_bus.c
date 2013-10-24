@@ -34,7 +34,7 @@ static void pt3_bus_add_cmd(struct pt3_bus *bus, enum pt3_bus_cmd cmd)
 		bus->cmds[bus->cmd_pos] = bus->cmd_tmp;
 		bus->cmd_pos++;
 		if (bus->cmd_pos >= sizeof(bus->cmds)) {
-			PT3_PRINTK(KERN_ALERT, "bus->cmds is overflow\n");
+			pr_debug("bus->cmds is overflow\n");
 			bus->cmd_pos = 0;
 		}
 	}
@@ -44,11 +44,11 @@ static void pt3_bus_add_cmd(struct pt3_bus *bus, enum pt3_bus_cmd cmd)
 u8 pt3_bus_data1(struct pt3_bus *bus, u32 index)
 {
 	if (unlikely(!bus->buf)) {
-		PT3_PRINTK(KERN_ALERT, "buf is not ready.\n");
+		pr_debug("buf is not ready.\n");
 		return 0;
 	}
 	if (unlikely(bus->buf_size < index + 1)) {
-		PT3_PRINTK(KERN_ALERT, "buf does not have enough size. buf_size=%d\n",
+		pr_debug("buf does not have enough size. buf_size=%d\n",
 				bus->buf_size);
 		return 0;
 	}
@@ -103,7 +103,7 @@ u32 pt3_bus_read(struct pt3_bus *bus, u8 *data, u32 size)
 		bus->buf_pos = 0;
 		bus->buf_size = size;
 	} else
-		PT3_PRINTK(KERN_ALERT, "bus read buf already exists.\n");
+		pr_debug("bus read buf already exists.\n");
 
 	return index;
 }
@@ -112,7 +112,7 @@ void pt3_bus_push_read_data(struct pt3_bus *bus, u8 data)
 {
 	if (unlikely(bus->buf)) {
 		if (bus->buf_pos >= bus->buf_size) {
-			PT3_PRINTK(KERN_ALERT, "buffer over run. pos=%d\n", bus->buf_pos);
+			pr_debug("buffer over run. pos=%d\n", bus->buf_pos);
 			bus->buf_pos = 0;
 		}
 		bus->buf[bus->buf_pos] = data;

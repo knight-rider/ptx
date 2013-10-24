@@ -34,7 +34,7 @@ static int pt3t_read_snr(struct dvb_frontend *fe, u16 *snr)
 	y = ((s64)y * x >> 30) + (5491ll << 29) / 10000;
 	y = ((s64)y * x >> 30) + (30965ll << 23) / 10000;
 	*snr = y >> 15;
-	PT3_PRINTK(KERN_INFO, "#%d CN=%d S/N=%d\n", adap->idx, cn, *snr);
+	pr_debug("#%d CN=%d S/N=%d\n", adap->idx, cn, *snr);
 	return 0;
 }
 
@@ -188,7 +188,7 @@ static int pt3t_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 			msleep_interruptible(2);
 		}
 		if (ret) {
-			PT3_PRINTK(KERN_ALERT, "#%d fail get_tmcc_t ret=%d\n", state->adap->idx, ret);
+			pr_debug("#%d fail get_tmcc_t ret=%d\n", state->adap->idx, ret);
 				state->tune_state = PT3T_ABORT;
 				*delay = HZ;
 				return 0;
