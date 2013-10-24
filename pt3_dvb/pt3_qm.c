@@ -33,16 +33,17 @@ void pt3_qm_dummy_reset(struct pt3_qm *qm, struct pt3_bus *bus)
 
 static void pt3_qm_sleep(struct pt3_bus *bus, u32 ms)
 {
-	if (bus) pt3_bus_sleep(bus, ms);
-	else PT3_WAIT_MS_INT(ms);
+	if (bus)
+		pt3_bus_sleep(bus, ms);
+	else
+		msleep_interruptible(ms);
 }
 
 static int pt3_qm_read(struct pt3_qm *qm, struct pt3_bus *bus, u8 addr, u8 *data)
 {
 	int ret = 0;
-	if ((addr == 0x00) || (addr == 0x0d)) {
+	if ((addr == 0x00) || (addr == 0x0d))
 		ret = pt3_tc_read_tuner(qm->adap, bus, addr, data);
-	}
 	return ret;
 }
 
@@ -67,7 +68,7 @@ static int pt3_qm_set_sleep_mode(struct pt3_qm *qm, struct pt3_bus *bus)
 		if (ret)
 			return ret;
 	} else {
-		qm->reg[0x01] |= 1 <<3;
+		qm->reg[0x01] |= 1 << 3;
 		qm->reg[0x01] &= (~(1 << 0)) & 0xff;
 		qm->reg[0x05] &= (~(1 << 3)) & 0xff;
 
@@ -78,7 +79,6 @@ static int pt3_qm_set_sleep_mode(struct pt3_qm *qm, struct pt3_bus *bus)
 		if (ret)
 			return ret;
 	}
-
 	return ret;
 }
 
@@ -94,50 +94,53 @@ int pt3_qm_init(struct pt3_qm *qm, struct pt3_bus *bus)
 	u32 i;
 	int ret;
 
-	if ((ret = pt3_qm_write(qm, bus, 0x01, PT3_QM_INIT_DUMMY_RESET)))
+	/* soft reset on */
+	ret = pt3_qm_write(qm, bus, 0x01, PT3_QM_INIT_DUMMY_RESET);
+	if (ret)
 		return ret;
 
 	pt3_qm_sleep(bus, 1);
 
+	/* soft reset off */
 	i_data = qm->reg[0x01] | 0x10;
-	if ((ret = pt3_qm_write(qm, bus, 0x01, i_data)))
+	ret = pt3_qm_write(qm, bus, 0x01, i_data);
+	if (ret)
 		return ret;
 
-	if ((ret = pt3_qm_read(qm, bus, 0x00, &i_data)))
+	/* ID check */
+	ret = pt3_qm_read(qm, bus, 0x00, &i_data);
+	if (ret)
 		return ret;
 
 	if ((bus == NULL) && (i_data != 0x48))
 		return -EINVAL;
 
+	/* LPF tuning on */
 	pt3_qm_sleep(bus, 1);
 	qm->reg[0x0c] |= 0x40;
-	if ((ret = pt3_qm_write(qm, bus, 0x0c, qm->reg[0x0c])))
+	ret = pt3_qm_write(qm, bus, 0x0c, qm->reg[0x0c]);
+	if (ret)
 		return ret;
 	pt3_qm_sleep(bus, qm->wait_time_lpf);
 
-	for (i = 0; i < sizeof(pt3_qm_flag); i++) {
+	for (i = 0; i < sizeof(pt3_qm_flag); i++)
 		if (pt3_qm_flag[i] == 1) {
-			if ((ret = pt3_qm_write(qm, bus, i, qm->reg[i])))
+			ret = pt3_qm_write(qm, bus, i, qm->reg[i]);
+			if (ret)
 				return ret;
 		}
-	}
-
-	if ((ret = pt3_qm_set_sleep_mode(qm, bus)))
+	ret = pt3_qm_set_sleep_mode(qm, bus);
+	if (ret)
 		return ret;
-	if ((ret = pt3_qm_set_search_mode(qm, bus)))
-		return ret;
-	return ret;
+	return pt3_qm_set_search_mode(qm, bus);
 }
 
 int pt3_qm_set_sleep(struct pt3_qm *qm, bool sleep)
 {
-	int ret;
-	enum pt3_ts_pin_mode mode;
-
-	mode = sleep ? PT3_TS_PIN_MODE_LOW : PT3_TS_PIN_MODE_NORMAL;
 	qm->standby = sleep;
 	if (sleep) {
-		if ((ret = pt3_tc_set_agc_s(qm->adap, PT3_TC_AGC_MANUAL)))
+		int ret = pt3_tc_set_agc_s(qm->adap, PT3_TC_AGC_MANUAL);
+		if (ret)
 			return ret;
 		pt3_qm_set_sleep_mode(qm, NULL);
 		pt3_tc_set_sleep_s(qm->adap, NULL, sleep);
@@ -178,30 +181,30 @@ static u32 PT3_QM_FREQ_TABLE[9][3] = {
 };
 
 static u32 SD_TABLE[24][2][3] = {
-	{{0x38fae1, 0x0d, 0x5},{0x39fae1, 0x0d, 0x5},},
-	{{0x3f570a, 0x0e, 0x3},{0x00570a, 0x0e, 0x3},},
-	{{0x05b333, 0x0e, 0x5},{0x06b333, 0x0e, 0x5},},
-	{{0x3c0f5c, 0x0f, 0x4},{0x3d0f5c, 0x0f, 0x4},},
-	{{0x026b85, 0x0f, 0x6},{0x036b85, 0x0f, 0x6},},
-	{{0x38c7ae, 0x10, 0x5},{0x39c7ae, 0x10, 0x5},},
-	{{0x3f23d7, 0x11, 0x3},{0x0023d7, 0x11, 0x3},},
-	{{0x058000, 0x11, 0x5},{0x068000, 0x11, 0x5},},
-	{{0x3bdc28, 0x12, 0x4},{0x3cdc28, 0x12, 0x4},},
-	{{0x023851, 0x12, 0x6},{0x033851, 0x12, 0x6},},
-	{{0x38947a, 0x13, 0x5},{0x39947a, 0x13, 0x5},},
-	{{0x3ef0a3, 0x14, 0x3},{0x3ff0a3, 0x14, 0x3},},
-	{{0x3c8000, 0x16, 0x4},{0x3d8000, 0x16, 0x4},},
-	{{0x048000, 0x16, 0x6},{0x058000, 0x16, 0x6},},
-	{{0x3c8000, 0x17, 0x5},{0x3d8000, 0x17, 0x5},},
-	{{0x048000, 0x18, 0x3},{0x058000, 0x18, 0x3},},
-	{{0x3c8000, 0x18, 0x6},{0x3d8000, 0x18, 0x6},},
-	{{0x048000, 0x19, 0x4},{0x058000, 0x19, 0x4},},
-	{{0x3c8000, 0x1a, 0x3},{0x3d8000, 0x1a, 0x3},},
-	{{0x048000, 0x1a, 0x5},{0x058000, 0x1a, 0x5},},
-	{{0x3c8000, 0x1b, 0x4},{0x3d8000, 0x1b, 0x4},},
-	{{0x048000, 0x1b, 0x6},{0x058000, 0x1b, 0x6},},
-	{{0x3c8000, 0x1c, 0x5},{0x3d8000, 0x1c, 0x5},},
-	{{0x048000, 0x1d, 0x3},{0x058000, 0x1d, 0x3},},
+	{{0x38fae1, 0x0d, 0x5}, {0x39fae1, 0x0d, 0x5},},
+	{{0x3f570a, 0x0e, 0x3}, {0x00570a, 0x0e, 0x3},},
+	{{0x05b333, 0x0e, 0x5}, {0x06b333, 0x0e, 0x5},},
+	{{0x3c0f5c, 0x0f, 0x4}, {0x3d0f5c, 0x0f, 0x4},},
+	{{0x026b85, 0x0f, 0x6}, {0x036b85, 0x0f, 0x6},},
+	{{0x38c7ae, 0x10, 0x5}, {0x39c7ae, 0x10, 0x5},},
+	{{0x3f23d7, 0x11, 0x3}, {0x0023d7, 0x11, 0x3},},
+	{{0x058000, 0x11, 0x5}, {0x068000, 0x11, 0x5},},
+	{{0x3bdc28, 0x12, 0x4}, {0x3cdc28, 0x12, 0x4},},
+	{{0x023851, 0x12, 0x6}, {0x033851, 0x12, 0x6},},
+	{{0x38947a, 0x13, 0x5}, {0x39947a, 0x13, 0x5},},
+	{{0x3ef0a3, 0x14, 0x3}, {0x3ff0a3, 0x14, 0x3},},
+	{{0x3c8000, 0x16, 0x4}, {0x3d8000, 0x16, 0x4},},
+	{{0x048000, 0x16, 0x6}, {0x058000, 0x16, 0x6},},
+	{{0x3c8000, 0x17, 0x5}, {0x3d8000, 0x17, 0x5},},
+	{{0x048000, 0x18, 0x3}, {0x058000, 0x18, 0x3},},
+	{{0x3c8000, 0x18, 0x6}, {0x3d8000, 0x18, 0x6},},
+	{{0x048000, 0x19, 0x4}, {0x058000, 0x19, 0x4},},
+	{{0x3c8000, 0x1a, 0x3}, {0x3d8000, 0x1a, 0x3},},
+	{{0x048000, 0x1a, 0x5}, {0x058000, 0x1a, 0x5},},
+	{{0x3c8000, 0x1b, 0x4}, {0x3d8000, 0x1b, 0x4},},
+	{{0x048000, 0x1b, 0x6}, {0x058000, 0x1b, 0x6},},
+	{{0x3c8000, 0x1c, 0x5}, {0x3d8000, 0x1c, 0x5},},
+	{{0x048000, 0x1d, 0x3}, {0x058000, 0x1d, 0x3},},
 };
 
 static int pt3_qm_tuning(struct pt3_qm *qm, struct pt3_bus *bus, u32 *sd, u32 channel)
@@ -234,7 +237,8 @@ static int pt3_qm_tuning(struct pt3_qm *qm, struct pt3_bus *bus, u32 *sd, u32 ch
 
 	qm->reg[0x06] &= 0x40;
 	qm->reg[0x06] |= N;
-	if ((ret = pt3_qm_write(qm, bus, 0x06, qm->reg[0x06])))
+	ret = pt3_qm_write(qm, bus, 0x06, qm->reg[0x06]);
+	if (ret)
 		return ret;
 
 	qm->reg[0x07] &= 0xf0;
@@ -250,14 +254,12 @@ static int pt3_qm_local_lpf_tuning(struct pt3_qm *qm, struct pt3_bus *bus, int l
 
 	if (ret)
 		return ret;
-
 	if (lpf) {
 		i_data = qm->reg[0x08] & 0xf0;
 		i_data |= 2;
 		ret = pt3_qm_write(qm, bus, 0x08, i_data);
-	} else {
+	} else
 		ret = pt3_qm_write(qm, bus, 0x08, qm->reg[0x08]);
-	}
 	if (ret)
 		return ret;
 
@@ -265,100 +267,111 @@ static int pt3_qm_local_lpf_tuning(struct pt3_qm *qm, struct pt3_bus *bus, int l
 	qm->reg[0x09] |= (sd >> 16) & 0x3f;
 	qm->reg[0x0a] = (sd >> 8) & 0xff;
 	qm->reg[0x0b] = (sd >> 0) & 0xff;
-	if ((ret = pt3_qm_write(qm, bus, 0x09, qm->reg[0x09])))
+	ret = pt3_qm_write(qm, bus, 0x09, qm->reg[0x09]);
+	if (ret)
 		return ret;
-	if ((ret = pt3_qm_write(qm, bus, 0x0a, qm->reg[0x0a])))
+	ret = pt3_qm_write(qm, bus, 0x0a, qm->reg[0x0a]);
+	if (ret)
 		return ret;
-	if ((ret = pt3_qm_write(qm, bus, 0x0b, qm->reg[0x0b])))
+	ret = pt3_qm_write(qm, bus, 0x0b, qm->reg[0x0b]);
+	if (ret)
 		return ret;
 
 	if (lpf) {
 		i_data = qm->reg[0x0c];
 		i_data &= 0x3f;
-		if ((ret = pt3_qm_write(qm, bus, 0x0c, i_data)))
+		ret = pt3_qm_write(qm, bus, 0x0c, i_data);
+		if (ret)
 			return ret;
 		pt3_qm_sleep(bus, 1);
 
 		i_data = qm->reg[0x0c];
 		i_data |= 0xc0;
-		if ((ret = pt3_qm_write(qm, bus, 0x0c, i_data)))
+		ret = pt3_qm_write(qm, bus, 0x0c, i_data);
+		if (ret)
 			return ret;
 		pt3_qm_sleep(bus, qm->wait_time_lpf);
-		if ((ret = pt3_qm_write(qm, bus, 0x08, 0x09)))
+		ret = pt3_qm_write(qm, bus, 0x08, 0x09);
+		if (ret)
 			return ret;
-		if ((ret = pt3_qm_write(qm, bus, 0x13, qm->reg[0x13])))
+		ret = pt3_qm_write(qm, bus, 0x13, qm->reg[0x13]);
+		if (ret)
 			return ret;
 	} else {
-		if ((ret = pt3_qm_write(qm, bus, 0x13, qm->reg[0x13])))
+		ret = pt3_qm_write(qm, bus, 0x13, qm->reg[0x13]);
+		if (ret)
 			return ret;
 		i_data = qm->reg[0x0c];
 		i_data &= 0x7f;
-		if ((ret = pt3_qm_write(qm, bus, 0x0c, i_data)))
+		ret = pt3_qm_write(qm, bus, 0x0c, i_data);
+		if (ret)
 			return ret;
 		pt3_qm_sleep(bus, 2);
 
 		i_data = qm->reg[0x0c];
 		i_data |= 0x80;
-		if ((ret = pt3_qm_write(qm, bus, 0x0c, i_data)))
+		ret = pt3_qm_write(qm, bus, 0x0c, i_data);
+		if (ret)
 			return ret;
-		if (qm->reg[0x03] & 0x01) {
+		if (qm->reg[0x03] & 0x01)
 			pt3_qm_sleep(bus, qm->wait_time_search_fast);
-		} else {
+		else
 			pt3_qm_sleep(bus, qm->wait_time_search_normal);
-		}
 	}
 	return ret;
 }
 
 int pt3_qm_get_locked(struct pt3_qm *qm, bool *locked)
 {
-	int ret;
-
-	if ((ret = pt3_qm_read(qm, NULL, 0x0d, &qm->reg[0x0d])))
+	int ret = pt3_qm_read(qm, NULL, 0x0d, &qm->reg[0x0d]);
+	if (ret)
 		return ret;
-	if (qm->reg[0x0d] & 0x40)	*locked = true;
-	else				*locked = false;
+	if (qm->reg[0x0d] & 0x40)
+		*locked = true;
+	else
+		*locked = false;
 	return ret;
 }
 
 int pt3_qm_set_frequency(struct pt3_qm *qm, u32 channel)
 {
-	int ret;
-	bool locked;
-	u32 number, freq, freq_khz;
+	u32 number, freq, freq_kHz;
 	struct timeval begin, now;
-
-	if ((ret = pt3_tc_set_agc_s(qm->adap, PT3_TC_AGC_MANUAL)))
+	bool locked;
+	int ret = pt3_tc_set_agc_s(qm->adap, PT3_TC_AGC_MANUAL);
+	if (ret)
 		return ret;
 
 	pt3_qm_get_channel_freq(channel, &number, &freq);
-	freq_khz = freq * 10;
+	freq_kHz = freq * 10;
 	if (pt3_tc_index(qm->adap) == 0)
-		freq_khz -= 500;
+		freq_kHz -= 500;
 	else
-		freq_khz += 500;
-	qm->adap->freq = freq_khz;
+		freq_kHz += 500;
+	qm->adap->freq = freq_kHz;
+	PT3_PRINTK(KERN_DEBUG, "#%d ch %d freq %d kHz\n", qm->adap->idx, channel, freq_kHz);
 
-	PT3_PRINTK(KERN_DEBUG, "#%d ch %d freq %d kHz\n", qm->adap->idx, channel, freq_khz);
-
-	if ((ret = pt3_qm_local_lpf_tuning(qm, NULL, 1, channel)))
+	ret = pt3_qm_local_lpf_tuning(qm, NULL, 1, channel);
+	if (ret)
 		return ret;
-
 	do_gettimeofday(&begin);
 	while (1) {
 		do_gettimeofday(&now);
-		if ((ret = pt3_qm_get_locked(qm, &locked)))
+		ret = pt3_qm_get_locked(qm, &locked);
+		if (ret)
 			return ret;
 		if (locked)
 			break;
 		if (pt3_tc_time_diff(&begin, &now) >= 100)
 			break;
-		PT3_WAIT_MS_INT(1);
+		msleep_interruptible(1);
 	}
+	PT3_PRINTK(KERN_DEBUG, "#%d qm_get_locked %d ret=0x%x\n", qm->adap->idx, locked, ret);
 	if (!locked)
 		return -ETIMEDOUT;
 
-	if(!(ret = pt3_tc_set_agc_s(qm->adap, PT3_TC_AGC_AUTO))) {
+	ret = pt3_tc_set_agc_s(qm->adap, PT3_TC_AGC_AUTO);
+	if (!ret) {
 		qm->adap->channel = channel;
 		qm->adap->offset = 0;
 	}

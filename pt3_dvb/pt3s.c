@@ -22,7 +22,8 @@ static int pt3s_read_snr(struct dvb_frontend *fe, u16 *snr)
 	s32 x1, x2, x3, x4, x5, y;
 
 	int ret = pt3_tc_read_cn_s(adap, NULL, &cn);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	cn -= 3000;
 	x1 = int_sqrt(cn << 16) * ((15625ll << 21) / 1000000);
@@ -74,11 +75,12 @@ u32 pt3s_get_channel(u32 frequency)
 	    ch2 = (freq - 159300) / 4000, diff2 = freq - (159300 + 4000 * ch2),
 	    min = diff0 < diff1 ? diff0 : diff1;
 
-	if (diff2 < min) {
+	if (diff2 < min)
 		return ch2 + 24;
-	} else if (min == diff1) {
+	else if (min == diff1)
 		return ch1 + 12;
-	} else return ch0;
+	else
+		return ch0;
 }
 
 static int pt3s_read_status(struct dvb_frontend *fe, fe_status_t *status)
@@ -116,9 +118,10 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 	int i, ret,
 	    freq = state->fe.dtv_property_cache.frequency,
 	    tsid = state->fe.dtv_property_cache.stream_id,
-	    ch = (freq < 1024) ? freq : pt3s_get_channel(freq);
+	    ch = (freq < 1024) ? freq : pt3s_get_channel(freq);	/* consider as channel ID if low */
 
-	if (re_tune) state->tune_state = PT3S_SET_FREQUENCY;
+	if (re_tune)
+		state->tune_state = PT3S_SET_FREQUENCY;
 
 	switch (state->tune_state) {
 	case PT3S_IDLE:
@@ -128,7 +131,8 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 
 	case PT3S_SET_FREQUENCY:
 		PT3_PRINTK(KERN_DEBUG, "#%d freq %d tsid 0x%x ch %d\n", adap->idx, freq, tsid, ch);
-		if ((ret = pt3_qm_set_frequency(adap->qm, ch)))
+		ret = pt3_qm_set_frequency(adap->qm, ch);
+		if (ret)
 			return ret;
 		adap->channel = ch;
 		state->tune_state = PT3S_SET_MODULATION;
@@ -138,8 +142,10 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 
 	case PT3S_SET_MODULATION:
 		for (i = 0; i < 1000; i++) {
-			if (!(ret = pt3_tc_read_tmcc_s(adap, NULL, tmcc))) break;
-			PT3_WAIT_MS_INT(1);
+			ret = pt3_tc_read_tmcc_s(adap, NULL, tmcc);
+			if (!ret)
+				break;
+			msleep_interruptible(1);
 		}
 		if (ret) {
 			PT3_PRINTK(KERN_ALERT, "fail tc_read_tmcc_s ret=0x%x\n", ret);
@@ -159,9 +165,11 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 				tmcc->id[4], tmcc->id[5], tmcc->id[6], tmcc->id[7]);
 		for (i = 0; i < sizeof(tmcc->id)/sizeof(tmcc->id[0]); i++) {
 			PT3_PRINTK(KERN_DEBUG, "tsid %x i %d tmcc->id %x\n", tsid, i, tmcc->id[i]);
-			if (tmcc->id[i] == tsid) break;
+			if (tmcc->id[i] == tsid)
+				break;
 		}
-		if (tsid < sizeof(tmcc->id)/sizeof(tmcc->id[0])) i = tsid;
+		if (tsid < sizeof(tmcc->id)/sizeof(tmcc->id[0]))	/* consider as slot# */
+			i = tsid;
 		if (i == sizeof(tmcc->id)/sizeof(tmcc->id[0])) {
 			PT3_PRINTK(KERN_ALERT, "#%d i%d tsid 0x%x not found\n", adap->idx, i, tsid);
 			return -EINVAL;
@@ -174,7 +182,8 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 		return 0;
 
 	case PT3S_SET_TS_ID:
-		if ((ret = pt3_tc_write_id_s(adap, NULL, (u16)tmcc->id[adap->offset]))) {
+		ret = pt3_tc_write_id_s(adap, NULL, (u16)tmcc->id[adap->offset]);
+		if (ret) {
 			PT3_PRINTK(KERN_ALERT, "fail set_tmcc_s ret=%d\n", ret);
 			return ret;
 		}
@@ -184,7 +193,8 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 	case PT3S_CHECK_TS_ID:
 		for (i = 0; i < 1000; i++) {
 			u16 short_id;
-			if ((ret = pt3_tc_read_id_s(adap, NULL, &short_id))) {
+			ret = pt3_tc_read_id_s(adap, NULL, &short_id);
+			if (ret) {
 				PT3_PRINTK(KERN_ERR, "fail get_id_s ret=%d\n", ret);
 				return ret;
 			}
@@ -192,7 +202,7 @@ static int pt3s_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 			PT3_PRINTK(KERN_DEBUG, "#%d tsid=0x%x\n", adap->idx, tsid);
 			if ((tsid & 0xffff) == tmcc->id[adap->offset])
 				break;
-			PT3_WAIT_MS_INT(1);
+			msleep_interruptible(1);
 		}
 		state->tune_state = PT3S_TRACK;
 
@@ -228,7 +238,8 @@ struct dvb_frontend *pt3s_attach(struct pt3_adapter *adap)
 	struct dvb_frontend *fe;
 	struct pt3s_state *state = kzalloc(sizeof(struct pt3s_state), GFP_KERNEL);
 
-	if (!state) return NULL;
+	if (!state)
+		return NULL;
 	state->adap = adap;
 	fe = &state->fe;
 	memcpy(&fe->ops, &pt3s_ops, sizeof(struct dvb_frontend_ops));

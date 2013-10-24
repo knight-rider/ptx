@@ -24,7 +24,8 @@ static int pt3t_read_snr(struct dvb_frontend *fe, u16 *snr)
 	s32 x, y;
 
 	int ret = pt3_tc_read_cndat_t(adap, NULL, &cn);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	x = 10 * (intlog10(0x540000 * 100 / cn) - (2 << 24));
 	y = (24ll << 46) / 1000000;
@@ -64,7 +65,8 @@ static int pt3t_get_tmcc(struct pt3_adapter *adap, struct tmcc_t *tmcc)
 {
 	int b = 0, retryov, tmunvld, fulock;
 
-	if (unlikely(!tmcc)) return -EINVAL;
+	if (unlikely(!tmcc))
+		return -EINVAL;
 	while (1) {
 		pt3_tc_read_retryov_tmunvld_fulock(adap, NULL, &retryov, &tmunvld, &fulock);
 		if (!fulock) {
@@ -74,7 +76,7 @@ static int pt3t_get_tmcc(struct pt3_adapter *adap, struct tmcc_t *tmcc)
 			if (retryov)
 				break;
 		}
-		PT3_WAIT_MS_INT(1);
+		msleep_interruptible(1);
 	}
 	if (likely(b))
 		pt3_tc_read_tmcc_t(adap, NULL, tmcc);
@@ -105,31 +107,42 @@ static int pt3t_read_status(struct dvb_frontend *fe, fe_status_t *status)
 	BUG();
 }
 
-#define NHK (REAL_TABLE[77])
+#define NHK (RF_TABLE[77])
 int pt3t_freq(int freq)
 {
-	if (freq > 255) return freq;
-	if (freq > 127) return REAL_TABLE[freq - 128];
-	if (freq > 63) {
+	if (freq >= 90000000)
+		return freq;				/* real_freq	*/
+	if (freq > 255)
+		return NHK;
+	if (freq > 127)
+		return RF_TABLE[freq - 128];		/* freqno (IO#)	*/
+	if (freq > 63) {				/* CATV		*/
 		freq -= 64;
-		if (freq > 22) return REAL_TABLE[freq - 1];
-		if (freq > 12) return REAL_TABLE[freq - 10];
+		if (freq > 22)
+			return RF_TABLE[freq - 1];	/* C23-C62	*/
+		if (freq > 12)
+			return RF_TABLE[freq - 10];	/* C13-C22	*/
 		return NHK;
 	}
-	if (freq > 62) return NHK;
-	if (freq > 12) return REAL_TABLE[freq + 50];
-	if (freq >  3) return REAL_TABLE[freq +  9];
-	if (freq)      return REAL_TABLE[freq -  1];
+	if (freq > 62)
+		return NHK;
+	if (freq > 12)
+		return RF_TABLE[freq + 50];		/* 13-62	*/
+	if (freq >  3)
+		return RF_TABLE[freq +  9];		/*  4-12	*/
+	if (freq)
+		return RF_TABLE[freq -  1];		/*  1-3		*/
 	return NHK;
 }
 
 static int pt3t_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flags, unsigned int *delay, fe_status_t *status)
 {
+	struct pt3t_state *state = fe->demodulator_priv;
 	struct tmcc_t tmcc_t;
 	int ret, i;
-	struct pt3t_state *state = fe->demodulator_priv;
 
-	if (re_tune) state->tune_state = PT3T_SET_FREQUENCY;
+	if (re_tune)
+		state->tune_state = PT3T_SET_FREQUENCY;
 
 	switch (state->tune_state) {
 	case PT3T_IDLE:
@@ -138,7 +151,8 @@ static int pt3t_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 		return 0;
 
 	case PT3T_SET_FREQUENCY:
-		if ((ret = pt3_tc_set_agc_t(state->adap, PT3_TC_AGC_MANUAL)))
+		ret = pt3_tc_set_agc_t(state->adap, PT3_TC_AGC_MANUAL);
+		if (ret)
 			return ret;
 		pt3_mx_tuner_rftune(state->adap, NULL, pt3t_freq(state->fe.dtv_property_cache.frequency));
 		state->tune_state = PT3T_CHECK_FREQUENCY;
@@ -148,7 +162,7 @@ static int pt3t_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 
 	case PT3T_CHECK_FREQUENCY:
 		if (!pt3_mx_locked(state->adap)) {
-			*delay = PT3_MS(1);
+			*delay = HZ;
 			*status = 0;
 			return 0;
 		}
@@ -158,7 +172,8 @@ static int pt3t_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 		return 0;
 
 	case PT3T_SET_MODULATION:
-		if ((ret = pt3_tc_set_agc_t(state->adap, PT3_TC_AGC_AUTO)))
+		ret = pt3_tc_set_agc_t(state->adap, PT3_TC_AGC_AUTO);
+		if (ret)
 			return ret;
 		state->tune_state = PT3T_CHECK_MODULATION;
 		*delay = 0;
@@ -167,14 +182,15 @@ static int pt3t_tune(struct dvb_frontend *fe, bool re_tune, unsigned int mode_fl
 
 	case PT3T_CHECK_MODULATION:
 		for (i = 0; i < 1000; i++) {
-			if (!(ret = pt3t_get_tmcc(state->adap, &tmcc_t)))
+			ret = pt3t_get_tmcc(state->adap, &tmcc_t);
+			if (!ret)
 				break;
-			PT3_WAIT_MS_INT(2);
+			msleep_interruptible(2);
 		}
 		if (ret) {
 			PT3_PRINTK(KERN_ALERT, "#%d fail get_tmcc_t ret=%d\n", state->adap->idx, ret);
 				state->tune_state = PT3T_ABORT;
-				*delay = 3 * HZ;
+				*delay = HZ;
 				return 0;
 		}
 		state->tune_state = PT3T_TRACK;
@@ -215,8 +231,8 @@ struct dvb_frontend *pt3t_attach(struct pt3_adapter *adap)
 {
 	struct dvb_frontend *fe;
 	struct pt3t_state *state = kzalloc(sizeof(struct pt3t_state), GFP_KERNEL);
-
-	if (!state) return NULL;
+	if (!state)
+		return NULL;
 	state->adap = adap;
 	fe = &state->fe;
 	memcpy(&fe->ops, &pt3t_ops, sizeof(struct dvb_frontend_ops));

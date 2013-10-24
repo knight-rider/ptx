@@ -1,6 +1,6 @@
 #define PT3_BUS_CMD_MAX   4096
-#define PT3_BUS_CMD_ADDR0 4096 + 0
-#define PT3_BUS_CMD_ADDR1 4096 + 2042
+#define PT3_BUS_CMD_ADDR0 (4096 + 0)
+#define PT3_BUS_CMD_ADDR1 (4096 + 2042)
 
 struct pt3_bus {
 	u32 read_addr, cmd_addr, cmd_count, cmd_pos, buf_pos, buf_size;
@@ -25,11 +25,10 @@ enum pt3_bus_cmd {
 
 static void pt3_bus_add_cmd(struct pt3_bus *bus, enum pt3_bus_cmd cmd)
 {
-	if ((bus->cmd_count % 2) == 0) {
+	if ((bus->cmd_count % 2) == 0)
 		bus->cmd_tmp = cmd;
-	} else {
+	else
 		bus->cmd_tmp |= cmd << 4;
-	}
 
 	if (bus->cmd_count % 2) {
 		bus->cmds[bus->cmd_pos] = bus->cmd_tmp;
@@ -53,7 +52,6 @@ u8 pt3_bus_data1(struct pt3_bus *bus, u32 index)
 				bus->buf_size);
 		return 0;
 	}
-
 	return bus->buf[index];
 }
 
@@ -79,9 +77,8 @@ void pt3_bus_write(struct pt3_bus *bus, const u8 *data, u32 size)
 
 	for (i = 0; i < size; i++) {
 		byte = data[i];
-		for (j = 0; j < 8; j++) {
+		for (j = 0; j < 8; j++)
 			pt3_bus_add_cmd(bus, PT3_SHIFT_MASK(byte, 7 - j, 1) ? I_DATA_H_NOP : I_DATA_L_NOP);
-		}
 		pt3_bus_add_cmd(bus, I_DATA_H_ACK0);
 	}
 }
@@ -92,10 +89,8 @@ u32 pt3_bus_read(struct pt3_bus *bus, u8 *data, u32 size)
 	u32 index;
 
 	for (i = 0; i < size; i++) {
-		for (j = 0; j < 8; j++) {
+		for (j = 0; j < 8; j++)
 			pt3_bus_add_cmd(bus, I_DATA_H_READ);
-		}
-
 		if (i == (size - 1))
 			pt3_bus_add_cmd(bus, I_DATA_H_NOP);
 		else
@@ -103,7 +98,7 @@ u32 pt3_bus_read(struct pt3_bus *bus, u8 *data, u32 size)
 	}
 	index = bus->read_addr;
 	bus->read_addr += size;
-	if (likely(bus->buf == NULL)) {
+	if (likely(!bus->buf)) {
 		bus->buf = data;
 		bus->buf_pos = 0;
 		bus->buf_size = size;
@@ -128,14 +123,13 @@ void pt3_bus_push_read_data(struct pt3_bus *bus, u8 data)
 void pt3_bus_sleep(struct pt3_bus *bus, u32 ms)
 {
 	u32 i;
-	for (i = 0; i< ms; i++)
+	for (i = 0; i < ms; i++)
 		pt3_bus_add_cmd(bus, I_SLEEP);
 }
 
 void pt3_bus_end(struct pt3_bus *bus)
 {
 	pt3_bus_add_cmd(bus, I_END);
-
 	if (bus->cmd_count % 2)
 		pt3_bus_add_cmd(bus, I_END);
 }

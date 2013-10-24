@@ -32,18 +32,19 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 	PT3_PRINTK(KERN_DEBUG, "#%d build page descriptor ts_count=%d ts_size=0x%x desc_count=%d desc_size=0x%x\n",
 		dma->adap->idx, dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
 	desc_info_pos = ts_info_pos = 0;
-	if (unlikely(!(desc_info = &dma->desc_info[desc_info_pos]))) {
-		PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate desc_info %d\n",
-				desc_info_pos);
+	desc_info = &dma->desc_info[desc_info_pos];
+	if (unlikely(!desc_info)) {
+		PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate desc_info %d\n", desc_info_pos);
 		return;
 	}
 	desc_addr = desc_info->addr;
 	desc_remain = desc_info->size;
 	desc_info->data_pos = 0;
 	prev = NULL;
-	if (unlikely(!(curr = &desc_info->data[desc_info->data_pos]))) {
+	curr = &desc_info->data[desc_info->data_pos];
+	if (unlikely(!curr)) {
 		PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate desc_info->data %d\n",
-				desc_info_pos);
+			desc_info_pos);
 		return;
 	}
 	desc_info_pos++;
@@ -51,12 +52,13 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 	for (i = 0; i < dma->ts_count; i++) {
 		if (unlikely(dma->ts_count <= ts_info_pos)) {
 			PT3_PRINTK(KERN_ALERT, "ts_info overflow max=%d curr=%d\n",
-					dma->ts_count, ts_info_pos);
+				dma->ts_count, ts_info_pos);
 			return;
 		}
-		if (unlikely(!(ts_info = &dma->ts_info[ts_info_pos]))) {
+		ts_info = &dma->ts_info[ts_info_pos];
+		if (unlikely(!ts_info)) {
 			PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate ts_info %d\n",
-					ts_info_pos);
+				ts_info_pos);
 			return;
 		}
 		ts_addr = ts_info->addr;
@@ -65,21 +67,22 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 		PT3_PRINTK(KERN_DEBUG, "#%d ts_info addr=0x%llx size=0x%x\n", dma->adap->idx, ts_addr, ts_size);
 		if (unlikely(!ts_info)) {
 			PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate ts_info %d\n",
-					ts_info_pos);
+				ts_info_pos);
 			return;
 		}
 		for (j = 0; j < ts_size / PT3_DMA_PAGE_SIZE; j++) {
 			if (desc_remain < PT3_DMA_DESC_SIZE) {
 				if (unlikely(dma->desc_count <= desc_info_pos)) {
 					PT3_PRINTK(KERN_ALERT, "desc_info overflow max=%d curr=%d\n",
-							dma->desc_count, desc_info_pos);
+						dma->desc_count, desc_info_pos);
 					return;
 				}
 				desc_info = &dma->desc_info[desc_info_pos];
 				desc_info->data_pos = 0;
-				if (unlikely(!(curr = &desc_info->data[desc_info->data_pos]))) {
+				curr = &desc_info->data[desc_info->data_pos];
+				if (unlikely(!curr)) {
 					PT3_PRINTK(KERN_ALERT, "dma maybe failed allocate desc_info->data %d\n",
-							desc_info_pos);
+						desc_info_pos);
 					return;
 				}
 				PT3_PRINTK(KERN_DEBUG, "#%d desc_info_pos=%d ts_addr=0x%llx remain=%d\n",
@@ -88,9 +91,8 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 				desc_remain = desc_info->size;
 				desc_info_pos++;
 			}
-			if (prev) {
+			if (prev)
 				pt3_dma_link_descriptor(desc_addr, prev);
-			}
 			pt3_dma_write_descriptor(ts_addr, PT3_DMA_PAGE_SIZE, 0, curr);
 			PT3_PRINTK(KERN_DEBUG, "#%d dma write desc ts_addr=0x%llx desc_info_pos=%d\n",
 				dma->adap->idx, ts_addr, desc_info_pos);
@@ -155,7 +157,8 @@ struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 	mutex_init(&dma->lock);
 
 	dma->ts_count = PT3_DMA_BLOCK_COUNT;
-	if (!(dma->ts_info = kzalloc(sizeof(struct pt3_dma_page) * dma->ts_count, GFP_KERNEL))) {
+	dma->ts_info = kzalloc(sizeof(struct pt3_dma_page) * dma->ts_count, GFP_KERNEL);
+	if (!dma->ts_info) {
 		PT3_PRINTK(KERN_ALERT, "fail allocate PT3_DMA_PAGE\n");
 		goto fail;
 	}
@@ -163,7 +166,8 @@ struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 		page = &dma->ts_info[i];
 		page->size = PT3_DMA_BLOCK_SIZE;
 		page->data_pos = 0;
-		if (!(page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr))) {
+		page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr);
+		if (!page->data) {
 			PT3_PRINTK(KERN_ALERT, "fail allocate consistent. %d\n", i);
 			goto fail;
 		}
@@ -171,7 +175,8 @@ struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 	PT3_PRINTK(KERN_DEBUG, "Allocate TS buffer.\n");
 
 	dma->desc_count = (PT3_DMA_TS_BUF_SIZE / (PT3_DMA_PAGE_SIZE) + PT3_DMA_MAX_DESCS - 1) / PT3_DMA_MAX_DESCS;
-	if (!(dma->desc_info = kzalloc(sizeof(struct pt3_dma_page) * dma->desc_count, GFP_KERNEL))) {
+	dma->desc_info = kzalloc(sizeof(struct pt3_dma_page) * dma->desc_count, GFP_KERNEL);
+	if (!dma->desc_info) {
 		PT3_PRINTK(KERN_ALERT, "fail allocate PT3_DMA_PAGE\n");
 		goto fail;
 	}
@@ -179,7 +184,8 @@ struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 		page = &dma->desc_info[i];
 		page->size = PT3_DMA_PAGE_SIZE;
 		page->data_pos = 0;
-		if (!(page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr))) {
+		page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr);
+		if (!page->data) {
 			PT3_PRINTK(KERN_ALERT, "fail allocate consistent. %d\n", i);
 			goto fail;
 		}
@@ -226,9 +232,9 @@ void pt3_dma_set_enabled(struct pt3_dma *dma, bool enabled)
 		writel(PT3_SHIFT_MASK(start_addr,  0, 32), base + REG_DMA_DESC_L);
 		writel(PT3_SHIFT_MASK(start_addr, 32, 32), base + REG_DMA_DESC_H);
 		PT3_PRINTK(KERN_DEBUG, "set descriptor address low %llx\n",
-				PT3_SHIFT_MASK(start_addr,  0, 32));
+			PT3_SHIFT_MASK(start_addr,  0, 32));
 		PT3_PRINTK(KERN_DEBUG, "set descriptor address high %llx\n",
-				PT3_SHIFT_MASK(start_addr, 32, 32));
+			PT3_SHIFT_MASK(start_addr, 32, 32));
 		writel(1 << 0, base + REG_DMA_CTL);
 	} else {
 		PT3_PRINTK(KERN_DEBUG, "#%d DMA disable\n", dma->adap->idx);
@@ -236,7 +242,7 @@ void pt3_dma_set_enabled(struct pt3_dma *dma, bool enabled)
 		while (1) {
 			if (!PT3_SHIFT_MASK(readl(base + REG_STATUS), 0, 1))
 				break;
-			PT3_WAIT_MS_INT(1);
+			msleep_interruptible(1);
 		}
 	}
 	dma->enabled = enabled;
@@ -248,7 +254,8 @@ static u32 pt3_dma_gray2binary(u32 gray, u32 bit)
 
 	for (i = 0; i < bit; i++) {
 		k = 0;
-		for (j = i; j < bit; j++) k = k ^ PT3_SHIFT_MASK(gray, j, 1);
+		for (j = i; j < bit; j++)
+			k = k ^ PT3_SHIFT_MASK(gray, j, 1);
 		binary |= k << i;
 	}
 	return binary;
@@ -306,9 +313,10 @@ ssize_t pt3_dma_copy(struct pt3_dma *dma, struct dvb_demux *demux, loff_t *ppos)
 		   dma->adap->idx, dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos, (int)(*ppos));
 	for (;;) {
 		for (i = 0; i < 20; i++) {
-			if ((ready = pt3_dma_ready(dma)))
+			ready = pt3_dma_ready(dma);
+			if (ready)
 				break;
-			PT3_WAIT_MS_INT(30);
+			msleep_interruptible(30);
 		}
 		if (!ready) {
 			PT3_PRINTK(KERN_DEBUG, "#%d dma_copy NOT READY\n", dma->adap->idx);

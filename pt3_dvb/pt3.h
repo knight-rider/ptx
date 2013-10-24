@@ -15,15 +15,16 @@
 #define PT3_NR_ADAPS 4
 #define PT3_SHIFT_MASK(val, shift, mask) (((val) >> (shift)) & (((u64)1<<(mask))-1))
 
+/* register idx */
 #define REG_VERSION	0x00	/*	R	Version		*/
 #define REG_BUS		0x04	/*	R	Bus		*/
 #define REG_SYSTEM_W	0x08	/*	W	System		*/
 #define REG_SYSTEM_R	0x0c	/*	R	System		*/
-#define REG_I2C_W 	0x10	/*	W	I2C		*/
-#define REG_I2C_R 	0x14	/*	R	I2C		*/
-#define REG_RAM_W 	0x18	/*	W	RAM		*/
-#define REG_RAM_R 	0x1c	/*	R	RAM		*/
-#define REG_BASE  	0x40	/* + 0x18*idx			*/
+#define REG_I2C_W	0x10	/*	W	I2C		*/
+#define REG_I2C_R	0x14	/*	R	I2C		*/
+#define REG_RAM_W	0x18	/*	W	RAM		*/
+#define REG_RAM_R	0x1c	/*	R	RAM		*/
+#define REG_BASE	0x40	/* + 0x18*idx			*/
 #define REG_DMA_DESC_L	0x00	/*	W	DMA		*/
 #define REG_DMA_DESC_H	0x04	/*	W	DMA		*/
 #define REG_DMA_CTL	0x08	/*	W	DMA		*/
@@ -31,14 +32,10 @@
 #define REG_STATUS	0x10	/*	R	DMA/FIFO/TS	*/
 #define REG_TS_ERR	0x14	/*	R	TS		*/
 
-#define PT3_MS(x)		msecs_to_jiffies(x)
-#define PT3_WAIT_MS_INT(x)	schedule_timeout_interruptible(PT3_MS(x))
-#define PT3_WAIT_MS_UNINT(x)	schedule_timeout_uninterruptible(PT3_MS(x))
-
 #define PT3_PRINTK(level, fmt, args...)\
-	{if (debug + 48 >= level[1]) printk(DRV_NAME " " level " " fmt, ##args);}
+	{ if (debug + 48 >= level[1]) printk(DRV_NAME " " level " " fmt, ##args); }
 
-static int lnb = 2;
+static int lnb = 2;	/* used if frontend does not set/the value is invalid */
 module_param(lnb, int, 0);
 MODULE_PARM_DESC(lnb, "LNB level (0:OFF 1:+11V 2:+15V)");
 
@@ -46,7 +43,7 @@ int debug = 0;
 module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "debug level (0-7)");
 
-static struct pci_device_id pt3_id_table[] = {
+static DEFINE_PCI_DEVICE_TABLE(pt3_id_table) = {
 	{ PCI_DEVICE(ID_VEN_ALTERA, ID_DEV_PT3) },
 	{ },
 };
@@ -76,6 +73,8 @@ enum {
 	LAYER_COUNT_S = LAYER_INDEX_H + 1,
 	LAYER_COUNT_T = LAYER_INDEX_C + 1,
 };
+
+/* Transmission and Multiplexing Configuration Control */
 
 struct tmcc_s {
 	u32 indicator;
@@ -152,8 +151,8 @@ struct pt3_adapter {
 	struct dmxdev dmxdev;
 	struct dvb_frontend *fe;
 	int (*orig_voltage)(struct dvb_frontend *fe, fe_sec_voltage_t voltage);
-	int (*orig_sleep  )(struct dvb_frontend *fe                          );
-	int (*orig_init   )(struct dvb_frontend *fe                          );
+	int (*orig_sleep)(struct dvb_frontend *fe);
+	int (*orig_init)(struct dvb_frontend *fe);
 	fe_sec_voltage_t voltage;
 };
 

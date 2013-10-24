@@ -65,19 +65,21 @@ int pt3_tc_set_ts_pins_mode(struct pt3_adapter *adap, struct pt3_ts_pins_mode *m
 		byte = mode->byte,
 		valid = mode->valid;
 
-	if (clock_data)	clock_data++;
-	if (byte)	byte++;
-	if (valid)	valid++;
+	if (clock_data)
+		clock_data++;
+	if (byte)
+		byte++;
+	if (valid)
+		valid++;
 	if (adap->type == SYS_ISDBS) {
 		u8 data[2];
 		int ret;
 		data[0] = 0x15 | (valid << 6);
 		data[1] = 0x04 | (clock_data << 4) | byte;
-
-		if ((ret = pt3_tc_write(adap, NULL, 0x1c, &data[0], 1)))	return ret;
-		return pt3_tc_write(adap, NULL, 0x1f, &data[1], 1);
+		return (ret = pt3_tc_write(adap, NULL, 0x1c, &data[0], 1)) ?
+			ret : pt3_tc_write(adap, NULL, 0x1f, &data[1], 1);
 	} else {
-		u8 data = (u8)(0x01 | (clock_data << 6) | (byte << 4) | (valid << 2)) ;
+		u8 data = (u8)(0x01 | (clock_data << 6) | (byte << 4) | (valid << 2));
 		return pt3_tc_write(adap, NULL, 0x1d, &data, 1);
 	}
 }
@@ -118,10 +120,10 @@ int pt3_tc_read_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8
 	int ret = 0;
 	u8 buf;
 	size_t rindex;
-	struct pt3_bus *p;
 
-	if (!(p = bus ? bus : vzalloc(sizeof(struct pt3_bus)))) {
-		PT3_PRINTK(KERN_ALERT, "out of memory.\n");
+	struct pt3_bus *p = bus ? bus : vzalloc(sizeof(struct pt3_bus));
+	if (!p) {
+		PT3_PRINTK(KERN_ALERT, "#%d tc_read_tuner out of memory\n", adap->idx);
 		return -ENOMEM;
 	}
 
@@ -173,17 +175,19 @@ u32 pt3_tc_index(struct pt3_adapter *adap)
 
 int pt3_tc_set_agc_s(struct pt3_adapter *adap, enum pt3_tc_agc agc)
 {
-	int ret;
 	u8 data = (agc == PT3_TC_AGC_AUTO) ? 0xff : 0x00;
-	if ((ret = pt3_tc_write(adap, NULL, 0x0a, &data, 1)))	return ret;
+	int ret = pt3_tc_write(adap, NULL, 0x0a, &data, 1);
+	if (ret)
+		return ret;
 
 	data = agc_data_s[pt3_tc_index(adap)];
 	data |= (agc == PT3_TC_AGC_AUTO) ? 0x01 : 0x00;
-	if ((ret = pt3_tc_write(adap, NULL, 0x10, &data, 1)))	return ret;
+	ret = pt3_tc_write(adap, NULL, 0x10, &data, 1);
+	if (ret)
+		return ret;
 
 	data = (agc == PT3_TC_AGC_AUTO) ? 0x40 : 0x00;
-	if ((ret = pt3_tc_write(adap, NULL, 0x11, &data, 1)))	return ret;
-	return pt3_tc_write_pskmsrst(adap);
+	return (ret = pt3_tc_write(adap, NULL, 0x11, &data, 1)) ? ret : pt3_tc_write_pskmsrst(adap);
 }
 
 int pt3_tc_set_sleep_s(struct pt3_adapter *adap, struct pt3_bus *bus, bool sleep)
@@ -194,15 +198,13 @@ int pt3_tc_set_sleep_s(struct pt3_adapter *adap, struct pt3_bus *bus, bool sleep
 
 int pt3_tc_set_agc_t(struct pt3_adapter *adap, enum pt3_tc_agc agc)
 {
-	int ret;
 	u8 data = (agc == PT3_TC_AGC_AUTO) ? 0x40 : 0x00;
+	int ret = pt3_tc_write(adap, NULL, 0x25, &data, 1);
+	if (ret)
+		return ret;
 
-	if ((ret = pt3_tc_write(adap, NULL, 0x25, &data, 1)))	return ret;
-
-	data = 0x4c;
-	data |= (agc == PT3_TC_AGC_AUTO) ? 0x00 : 0x01;
-	if ((ret = pt3_tc_write(adap, NULL, 0x23, &data, 1)))	return ret;
-	return pt3_tc_write_imsrst(adap);
+	data = 0x4c | ((agc == PT3_TC_AGC_AUTO) ? 0x00 : 0x01);
+	return (ret = pt3_tc_write(adap, NULL, 0x23, &data, 1)) ? ret : pt3_tc_write_imsrst(adap);
 }
 
 int pt3_tc_write_tuner_without_addr(struct pt3_adapter *adap, struct pt3_bus *bus, const u8 *data, u32 size)
@@ -330,7 +332,8 @@ int pt3_tc_read_cn_s(struct pt3_adapter *adap, struct pt3_bus *bus, u32 *cn)
 {
 	u8 data[2];
 	int ret = pt3_tc_read(adap, bus, 0xbc, data, sizeof(data));
-	if (!ret) *cn = pt3_tc_byten(data,2);
+	if (!ret)
+		*cn = pt3_tc_byten(data, 2);
 	return ret;
 }
 
@@ -338,7 +341,8 @@ int pt3_tc_read_cndat_t(struct pt3_adapter *adap, struct pt3_bus *bus, u32 *cn)
 {
 	u8 data[3];
 	int ret = pt3_tc_read(adap, bus, 0x8b, data, sizeof(data));
-	if (!ret) *cn = pt3_tc_byten(data,3);
+	if (!ret)
+		*cn = pt3_tc_byten(data, 3);
 	return ret;
 }
 
@@ -356,12 +360,15 @@ int pt3_tc_read_retryov_tmunvld_fulock(struct pt3_adapter *adap, struct pt3_bus 
 
 int pt3_tc_read_tmcc_t(struct pt3_adapter *adap, struct pt3_bus *bus, struct tmcc_t *tmcc)
 {
-	int ret;
-	u8 data[8];
 	u32 interleave0h, interleave0l, segment1h, segment1l;
+	u8 data[8];
 
-	if ((ret = pt3_tc_read(adap, bus, 0xb2+0, &data[0], 4)))	return ret;
-	if ((ret = pt3_tc_read(adap, bus, 0xb2+4, &data[4], 4)))	return ret;
+	int ret = pt3_tc_read(adap, bus, 0xb2+0, &data[0], 4);
+	if (ret)
+		return ret;
+	ret = pt3_tc_read(adap, bus, 0xb2+4, &data[4], 4);
+	if (ret)
+		return ret;
 
 	tmcc->system    = PT3_SHIFT_MASK(data[0], 6, 2);
 	tmcc->indicator = PT3_SHIFT_MASK(data[0], 2, 4);
@@ -399,19 +406,30 @@ int pt3_tc_read_tmcc_s(struct pt3_adapter *adap, struct pt3_bus *bus, struct tmc
 		BASE = 0xc5,
 		SIZE = 0xe5 - BASE + 1
 	};
-	int ret;
 	u8 data[SIZE];
 	u32 i, byte_offset, bit_offset;
 
-	if ((ret = pt3_tc_read(adap, bus, 0xc3, data, 1)))	return ret;
-	if (PT3_SHIFT_MASK(data[0], 4, 1))			return -EBADMSG;
-	if ((ret = pt3_tc_read(adap, bus, 0xce, data, 2)))	return ret;
-	if (pt3_tc_byten(data,2) == 0)				return -EBADMSG;
-	if ((ret = pt3_tc_read(adap, bus, 0xc3, data, 1)))	return ret;
+	int ret = pt3_tc_read(adap, bus, 0xc3, data, 1);
+	if (ret)
+		return ret;
+	if (PT3_SHIFT_MASK(data[0], 4, 1))
+		return -EBADMSG;
+
+	ret = pt3_tc_read(adap, bus, 0xce, data, 2);
+	if (ret)
+		return ret;
+	if (pt3_tc_byten(data, 2) == 0)
+		return -EBADMSG;
+
+	ret = pt3_tc_read(adap, bus, 0xc3, data, 1);
+	if (ret)
+		return ret;
 	tmcc->emergency = PT3_SHIFT_MASK(data[0], 2, 1);
 	tmcc->extflag   = PT3_SHIFT_MASK(data[0], 1, 1);
 
-	if ((ret = pt3_tc_read(adap, bus, 0xc5, data, SIZE)))	return ret;
+	ret = pt3_tc_read(adap, bus, 0xc5, data, SIZE);
+	if (ret)
+		return ret;
 	tmcc->indicator = PT3_SHIFT_MASK(data[0xc5 - BASE], 3, 5);
 	tmcc->uplink    = PT3_SHIFT_MASK(data[0xc7 - BASE], 0, 4);
 
@@ -436,7 +454,8 @@ int pt3_tc_read_id_s(struct pt3_adapter *adap, struct pt3_bus *bus, u16 *id)
 {
 	u8 data[2];
 	int ret = pt3_tc_read(adap, bus, 0xe6, data, sizeof(data));
-	if (!ret) *id = pt3_tc_byten(data,2);
+	if (!ret)
+		*id = pt3_tc_byten(data, 2);
 	return ret;
 }
 
