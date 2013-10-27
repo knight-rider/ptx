@@ -5,8 +5,7 @@
 #include "pt3_qm.c"
 #include "pt3_mx.c"
 #include "pt3_dma.c"
-#include "pt3s.c"
-#include "pt3t.c"
+#include "pt3_fe.c"
 
 MODULE_AUTHOR("Budi Rachmanto <knightrider(@)are.ma>");
 MODULE_DESCRIPTION("Earthsoft PT3 DVB Driver");
@@ -398,11 +397,11 @@ static int pt3_init_frontends(struct pt3_board *pt3)
 
 	for (i = 0; i < PT3_NR_ADAPS; i++)
 		if (pt3->adap[i]->type == SYS_ISDBS) {
-			fe[i] = pt3s_attach(pt3->adap[i]);
+			fe[i] = pt3_fe_s_attach(pt3->adap[i]);
 			if (!fe[i])
 				break;
 		} else {
-			fe[i] = pt3t_attach(pt3->adap[i]);
+			fe[i] = pt3_fe_t_attach(pt3->adap[i]);
 			if (!fe[i])
 				break;
 		}

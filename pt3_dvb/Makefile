@@ -11,7 +11,7 @@ INSTALL_DIR = /lib/modules/$(KVER)/kernel/drivers/video
 
 all: ${TARGET}
 
-pt3_dvb.ko: pt3.c pt3.h pt3_dma.c pt3_bus.c pt3_qm.c pt3_mx.c pt3_i2c.c pt3_tc.c pt3s.c pt3t.c
+pt3_dvb.ko: pt3.c pt3.h pt3_dma.c pt3_bus.c pt3_qm.c pt3_mx.c pt3_i2c.c pt3_tc.c pt3_fe.c
 	make -C $(KBUILD) M=`pwd` V=$(VERBOSITY) modules
 
 clean:
