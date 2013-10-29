@@ -1,11 +1,4 @@
-#define PT3_BUS_CMD_MAX   4096
-#define PT3_BUS_CMD_ADDR0 (4096 + 0)
-#define PT3_BUS_CMD_ADDR1 (4096 + 2042)
-
-struct pt3_bus {
-	u32 read_addr, cmd_addr, cmd_count, cmd_pos, buf_pos, buf_size;
-	u8 cmd_tmp, cmds[PT3_BUS_CMD_MAX], *buf;
-};
+#include "pt3.h"
 
 enum pt3_bus_cmd {
 	I_END,

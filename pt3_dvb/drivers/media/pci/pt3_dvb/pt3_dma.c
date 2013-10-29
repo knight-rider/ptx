@@ -1,3 +1,5 @@
+#include "pt3.h"
+
 #define PT3_DMA_DESC_SIZE	20
 #define PT3_DMA_PAGE_SIZE	4096
 #define PT3_DMA_MAX_DESCS	204	/* 4096 / 20 */
@@ -8,57 +10,42 @@
 
 static void pt3_dma_link_descriptor(u64 next_addr, u8 *desc)
 {
-	(*(u64 *)(desc + 12)) = next_addr | 2;
+	*(u64 *)(desc + 0x0c) = next_addr | 0b10;	/* read next desc & continue */
 }
 
 static void pt3_dma_write_descriptor(u64 ts_addr, u32 size, u64 next_addr, u8 *desc)
 {
-	(*(u64 *)(desc +  0)) = ts_addr   | 7;
-	(*(u32 *)(desc +  8)) = size      | 7;
-	(*(u64 *)(desc + 12)) = next_addr | 2;
+	*(u64 *)(desc + 0x00) = ts_addr   | 0b111;	/* page addr */
+	*(u32 *)(desc + 0x08) = size      | 0b111;	/* page size */
+	*(u64 *)(desc + 0x0c) = next_addr | 0b10;	/* read next desc & continue */
 }
 
-void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
+void pt3_dma_build_page_descriptor(struct pt3_dma *dma)
 {
 	struct pt3_dma_page *desc_info, *ts_info;
 	u64 ts_addr, desc_addr;
 	u32 i, j, ts_size, desc_remain, ts_info_pos, desc_info_pos;
 	u8 *prev, *curr;
 
-	if (unlikely(!dma)) {
-		pr_debug("dma build page descriptor needs DMA\n");
-		return;
-	}
 	pr_debug("#%d build page descriptor ts_count=%d ts_size=0x%x desc_count=%d desc_size=0x%x\n",
 		dma->adap->idx, dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
 	desc_info_pos = ts_info_pos = 0;
 	desc_info = &dma->desc_info[desc_info_pos];
-	if (unlikely(!desc_info)) {
-		pr_debug("dma maybe failed allocate desc_info %d\n", desc_info_pos);
-		return;
-	}
-	desc_addr = desc_info->addr;
+	desc_addr   = desc_info->addr;
 	desc_remain = desc_info->size;
 	desc_info->data_pos = 0;
 	prev = NULL;
 	curr = &desc_info->data[desc_info->data_pos];
-	if (unlikely(!curr)) {
-		pr_debug("dma maybe failed allocate desc_info->data %d\n",
-			desc_info_pos);
-		return;
-	}
 	desc_info_pos++;
 
 	for (i = 0; i < dma->ts_count; i++) {
 		if (unlikely(dma->ts_count <= ts_info_pos)) {
-			pr_debug("ts_info overflow max=%d curr=%d\n",
-				dma->ts_count, ts_info_pos);
+			pr_debug("ts_info overflow max=%d curr=%d\n", dma->ts_count, ts_info_pos);
 			return;
 		}
 		ts_info = &dma->ts_info[ts_info_pos];
 		if (unlikely(!ts_info)) {
-			pr_debug("dma maybe failed allocate ts_info %d\n",
-				ts_info_pos);
+			pr_debug("DMA maybe failed allocating ts_info %d\n", ts_info_pos);
 			return;
 		}
 		ts_addr = ts_info->addr;
@@ -66,8 +53,7 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 		ts_info_pos++;
 		pr_debug("#%d ts_info addr=0x%llx size=0x%x\n", dma->adap->idx, ts_addr, ts_size);
 		if (unlikely(!ts_info)) {
-			pr_debug("dma maybe failed allocate ts_info %d\n",
-				ts_info_pos);
+			pr_debug("DMA maybe failed allocating ts_info %d\n", ts_info_pos);
 			return;
 		}
 		for (j = 0; j < ts_size / PT3_DMA_PAGE_SIZE; j++) {
@@ -81,7 +67,7 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 				desc_info->data_pos = 0;
 				curr = &desc_info->data[desc_info->data_pos];
 				if (unlikely(!curr)) {
-					pr_debug("dma maybe failed allocate desc_info->data %d\n",
+					pr_debug("DMA maybe failed allocating desc_info->data %d\n",
 						desc_info_pos);
 					return;
 				}
@@ -109,13 +95,8 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma, bool loop)
 			desc_remain -= PT3_DMA_DESC_SIZE;
 		}
 	}
-
-	if (prev) {
-		if (loop)
-			pt3_dma_link_descriptor(dma->desc_info->addr, prev);
-		else
-			pt3_dma_link_descriptor(1, prev);
-	}
+	if (prev)
+		pt3_dma_link_descriptor(dma->desc_info->addr, prev);
 }
 
 void pt3_dma_free(struct pt3_dma *dma)
@@ -192,7 +173,7 @@ struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 	}
 	pr_debug("Allocate Descriptor buffer.\n");
 
-	pt3_dma_build_page_descriptor(dma, true);
+	pt3_dma_build_page_descriptor(dma);
 	pr_debug("set page descriptor.\n");
 	return dma;
 fail:
@@ -231,10 +212,8 @@ void pt3_dma_set_enabled(struct pt3_dma *dma, bool enabled)
 		writel(1 << 1, base + REG_DMA_CTL);
 		writel(PT3_SHIFT_MASK(start_addr,  0, 32), base + REG_DMA_DESC_L);
 		writel(PT3_SHIFT_MASK(start_addr, 32, 32), base + REG_DMA_DESC_H);
-		pr_debug("set descriptor address low %llx\n",
-			PT3_SHIFT_MASK(start_addr,  0, 32));
-		pr_debug("set descriptor address high %llx\n",
-			PT3_SHIFT_MASK(start_addr, 32, 32));
+		pr_debug("set descriptor address low %llx\n",  PT3_SHIFT_MASK(start_addr,  0, 32));
+		pr_debug("set descriptor address high %llx\n", PT3_SHIFT_MASK(start_addr, 32, 32));
 		writel(1 << 0, base + REG_DMA_CTL);
 	} else {
 		pr_debug("#%d DMA disable\n", dma->adap->idx);
@@ -248,6 +227,7 @@ void pt3_dma_set_enabled(struct pt3_dma *dma, bool enabled)
 	dma->enabled = enabled;
 }
 
+/* convert Gray code to binary, e.g. 1001 -> 1110 */
 static u32 pt3_dma_gray2binary(u32 gray, u32 bit)
 {
 	u32 binary = 0, i, j, k;
@@ -265,12 +245,6 @@ u32 pt3_dma_get_ts_error_packet_count(struct pt3_dma *dma)
 {
 	return pt3_dma_gray2binary(readl(pt3_dma_get_base_addr(dma) + REG_TS_ERR), 32);
 }
-
-enum pt3_dma_mode {
-	USE_LFSR = 1 << 16,
-	REVERSE  = 1 << 17,
-	RESET    = 1 << 18,
-};
 
 void pt3_dma_set_test_mode(struct pt3_dma *dma, enum pt3_dma_mode mode, u16 initval)
 {

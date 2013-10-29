@@ -1,3 +1,5 @@
+#include "pt3.h"
+
 #define PT3_I2C_DATA_OFFSET 2048
 
 bool pt3_i2c_is_clean(struct pt3_i2c *i2c)

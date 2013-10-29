@@ -1,3 +1,5 @@
+#include "pt3.h"
+
 int pt3_tc_write(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, const u8 *data, u32 size)
 {
 	int ret = 0;
@@ -160,11 +162,6 @@ int pt3_tc_read_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, u8
 		   adap->idx, adap->addr_tc, adap->addr_tuner);
 	return ret;
 }
-
-enum pt3_tc_agc {
-	PT3_TC_AGC_AUTO,
-	PT3_TC_AGC_MANUAL,
-};
 
 static u8 agc_data_s[2] = { 0xb0, 0x30 };
 

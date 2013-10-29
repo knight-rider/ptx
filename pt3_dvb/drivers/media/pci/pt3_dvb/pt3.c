@@ -1,15 +1,16 @@
 #include "pt3.h"
-#include "pt3_bus.c"
-#include "pt3_i2c.c"
-#include "pt3_tc.c"
-#include "pt3_qm.c"
-#include "pt3_mx.c"
-#include "pt3_dma.c"
-#include "pt3_fe.c"
 
-MODULE_AUTHOR("Budi Rachmanto <knightrider(@)are.ma>");
+MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
 MODULE_DESCRIPTION("Earthsoft PT3 DVB Driver");
 MODULE_LICENSE("GPL");
+
+static DEFINE_PCI_DEVICE_TABLE(pt3_id_table) = {
+	{ PCI_DEVICE(0x1172, 0x4c15) },
+	{ },
+};
+MODULE_DEVICE_TABLE(pci, pt3_id_table);
+
+#define DRV_NAME "pt3_dvb"
 
 static int pt3_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset)
 {
@@ -37,6 +38,15 @@ static int pt3_set_tuner_sleep(struct pt3_adapter *adap, bool sleep)
 	msleep_interruptible(10);
 	return ret;
 }
+
+struct {
+	u32 bits;
+	char *str;
+} pt3_lnb[] = {
+	{0b1100,  "0V"},
+	{0b1101, "11V"},
+	{0b1111, "15V"},
+};
 
 static int pt3_update_lnb(struct pt3_board *pt3)
 {
@@ -478,6 +488,18 @@ static int pt3_abort(struct pci_dev *pdev, int ret, char *fmt, ...)
 	pt3_remove(pdev);
 	return ret;
 }
+
+struct {
+	fe_delivery_system_t type;
+	u8 addr_tuner, addr_tc;
+	int init_ch;
+	char *str;
+} pt3_config[] = {
+	{SYS_ISDBS, 0x63, 0b00010001,  0, "ISDB-S"},
+	{SYS_ISDBS, 0x60, 0b00010011,  0, "ISDB-S"},
+	{SYS_ISDBT, 0x62, 0b00010000, 70, "ISDB-T"},
+	{SYS_ISDBT, 0x61, 0b00010010, 71, "ISDB-T"},
+};
 
 static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
