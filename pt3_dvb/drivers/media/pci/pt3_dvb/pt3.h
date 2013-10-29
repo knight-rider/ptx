@@ -129,7 +129,7 @@ struct pt3_adapter {
 	struct pt3_qm *qm;
 	struct pt3_dma *dma;
 	struct task_struct *kthread;
-
+	int *dec;
 	struct dvb_adapter dvb;
 	struct dvb_demux demux;
 	int users;
