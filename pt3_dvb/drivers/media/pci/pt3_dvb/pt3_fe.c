@@ -687,34 +687,10 @@ struct pt3_fe_s_state {
 	enum pt3_fe_s_tune_state tune_state;
 };
 
-static int pt3_fe_s_read_snr(struct dvb_frontend *fe, u16 *snr)
+static int pt3_fe_s_read_signal_strength(struct dvb_frontend *fe, u16 *cn)
 {
 	struct pt3_fe_s_state *state = fe->demodulator_priv;
-	struct pt3_adapter *adap = state->adap;
-	u32 cn = 0;
-	s32 x1, x2, x3, x4, x5, y;
-
-	int ret = pt3_tc_read_cn_s(adap, NULL, &cn);
-	if (ret)
-		return ret;
-
-	cn -= 3000;
-	x1 = int_sqrt(cn << 16) * ((15625ll << 21) / 1000000);
-	x2 = (s64)x1 * x1 >> 31;
-	x3 = (s64)x2 * x1 >> 31;
-	x4 = (s64)x2 * x2 >> 31;
-	x5 = (s64)x4 * x1 >> 31;
-
-	y = (58857ll << 23) / 1000;
-	y -= (s64)x1 * ((89565ll << 24) / 1000) >> 30;
-	y += (s64)x2 * ((88977ll << 24) / 1000) >> 28;
-	y -= (s64)x3 * ((50259ll << 25) / 1000) >> 27;
-	y += (s64)x4 * ((14341ll << 27) / 1000) >> 27;
-	y -= (s64)x5 * ((16346ll << 30) / 10000) >> 28;
-
-	*snr = y < 0 ? 0 : y >> 15;
-	pr_debug("#%d cn=%d s/n=%d\n", adap->idx, cn, *snr);
-	return 0;
+	return pt3_tc_read_cn_s(state->adap, NULL, (u32 *)cn);
 }
 
 static int pt3_fe_s_get_frontend_algo(struct dvb_frontend *fe)
@@ -897,7 +873,7 @@ static struct dvb_frontend_ops pt3_fe_s_ops = {
 		.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO | FE_CAN_QAM_AUTO | FE_CAN_MULTISTREAM |
 			FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
 	},
-	.read_snr = pt3_fe_s_read_snr,
+	.read_signal_strength = pt3_fe_s_read_signal_strength,
 	.read_status = pt3_fe_s_read_status,
 	.get_frontend_algo = pt3_fe_s_get_frontend_algo,
 	.release = pt3_fe_s_release,
@@ -938,26 +914,10 @@ struct pt3_fe_t_state {
 	enum pt3_fe_t_tune_state tune_state;
 };
 
-static int pt3_fe_t_read_snr(struct dvb_frontend *fe, u16 *snr)
+static int pt3_fe_t_read_signal_strength(struct dvb_frontend *fe, u16 *cn)
 {
 	struct pt3_fe_t_state *state = fe->demodulator_priv;
-	struct pt3_adapter *adap = state->adap;
-	u32 cn = 0;
-	s32 x, y;
-
-	int ret = pt3_tc_read_cndat_t(adap, NULL, &cn);
-	if (ret)
-		return ret;
-
-	x = 10 * (intlog10(0x540000 * 100 / cn) - (2 << 24));
-	y = (24ll << 46) / 1000000;
-	y = ((s64)y * x >> 30) - (16ll << 40) / 10000;
-	y = ((s64)y * x >> 29) + (398ll << 35) / 10000;
-	y = ((s64)y * x >> 30) + (5491ll << 29) / 10000;
-	y = ((s64)y * x >> 30) + (30965ll << 23) / 10000;
-	*snr = y >> 15;
-	pr_debug("#%d CN=%d S/N=%d\n", adap->idx, cn, *snr);
-	return 0;
+	return pt3_tc_read_cndat_t(state->adap, NULL, (u32 *)cn);
 }
 
 static int pt3_fe_t_get_frontend_algo(struct dvb_frontend *fe)
@@ -1140,7 +1100,7 @@ static struct dvb_frontend_ops pt3_fe_t_ops = {
 		.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO | FE_CAN_QAM_AUTO |
 			FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
 	},
-	.read_snr = pt3_fe_t_read_snr,
+	.read_signal_strength = pt3_fe_t_read_signal_strength,
 	.read_status = pt3_fe_t_read_status,
 	.get_frontend_algo = pt3_fe_t_get_frontend_algo,
 	.release = pt3_fe_t_release,

@@ -552,11 +552,11 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		adap = pt3_alloc_adapter(pt3);
 		if (IS_ERR(adap))
 			return pt3_abort(pdev, PTR_ERR(adap), "Failed pt3_alloc_adapter\n");
+		adap->idx = i;
 		adap->dma = pt3_dma_create(adap);
 		if (!adap->dma)
 			return pt3_abort(pdev, -ENOMEM, "Failed pt3_dma_create\n");
 		mutex_init(&adap->lock);
-		adap->idx = i;
 		pt3->adap[i] = adap;
 		adap->type       = pt3_config[i].type;
 		adap->addr_tuner = pt3_config[i].addr_tuner;
