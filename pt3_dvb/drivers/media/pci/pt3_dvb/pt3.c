@@ -70,7 +70,7 @@ static int pt3_update_lnb(struct pt3_board *pt3)
 		}
 		mutex_unlock(&pt3->lock);
 		if (unlikely(lnb_eff < 0 || 2 < lnb_eff)) {
-			pr_debug("Inconsistent LNB settings\n");
+			pr_err("Inconsistent LNB settings\n");
 			return -EINVAL;
 		}
 		if (pt3->lnb != lnb_eff) {
@@ -139,7 +139,7 @@ static int pt3_start_feed(struct dvb_demux_feed *feed)
 	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
 	if (!adap->users++) {
 		if (adap->in_use) {
-			pr_debug("device is already used\n");
+			pr_err("#%d device is already used\n", adap->idx);
 			return -EIO;
 		}
 		pr_debug("#%d %s selected, DMA %s\n",
@@ -219,41 +219,6 @@ err:
 	return ERR_PTR(ret);
 }
 
-static int pt3_tuner_init_s(struct pt3_i2c *i2c, struct pt3_adapter *adap)
-{
-	int ret;
-	struct pt3_bus *bus = vzalloc(sizeof(struct pt3_bus));
-
-	if (!bus)
-		return -ENOMEM;
-	pt3_qm_init_reg_param(adap->qm);
-	pt3_qm_dummy_reset(adap->qm, bus);
-	pt3_bus_end(bus);
-	ret = pt3_i2c_run(i2c, bus, true);
-	vfree(bus);
-	if (ret) {
-		pr_debug("fail pt3_tuner_init_s dummy reset ret=%d\n", ret);
-		return ret;
-	}
-
-	bus = vzalloc(sizeof(struct pt3_bus));
-	if (!bus)
-		return -ENOMEM;
-	ret = pt3_qm_init(adap->qm, bus);
-	if (ret) {
-		vfree(bus);
-		return ret;
-	}
-	pt3_bus_end(bus);
-	ret = pt3_i2c_run(i2c, bus, true);
-	vfree(bus);
-	if (ret) {
-		pr_debug("fail pt3_tuner_init_s qm init ret=%d\n", ret);
-		return ret;
-	}
-	return ret;
-}
-
 static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 {
 	int ret, i, j;
@@ -284,14 +249,14 @@ static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 		if (pt3->adap[i]->type == SYS_ISDBS) {
 			for (j = 0; j < 10; j++) {
 				if (j)
-					pr_debug("retry pt3_tuner_init_s\n");
-				ret = pt3_tuner_init_s(pt3->i2c, pt3->adap[i]);
+					pr_debug("retry pt3_qm_tuner_init\n");
+				ret = pt3_qm_tuner_init(pt3->i2c, pt3->adap[i]);
 				if (!ret)
 					break;
 				msleep_interruptible(1);
 			}
 			if (ret) {
-				pr_debug("fail pt3_tuner_init_s %d ret=0x%x\n", i, ret);
+				pr_debug("fail pt3_qm_tuner_init %d ret=0x%x\n", i, ret);
 				goto last;
 			}
 		}

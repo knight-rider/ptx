@@ -138,6 +138,41 @@ int pt3_qm_init(struct pt3_qm *qm, struct pt3_bus *bus)
 	return pt3_qm_set_search_mode(qm, bus);
 }
 
+int pt3_qm_tuner_init(struct pt3_i2c *i2c, struct pt3_adapter *adap)
+{
+	int ret;
+	struct pt3_bus *bus = vzalloc(sizeof(struct pt3_bus));
+
+	if (!bus)
+		return -ENOMEM;
+	pt3_qm_init_reg_param(adap->qm);
+	pt3_qm_dummy_reset(adap->qm, bus);
+	pt3_bus_end(bus);
+	ret = pt3_i2c_run(i2c, bus, true);
+	vfree(bus);
+	if (ret) {
+		pr_debug("fail pt3_qm_tuner_init dummy reset ret=%d\n", ret);
+		return ret;
+	}
+
+	bus = vzalloc(sizeof(struct pt3_bus));
+	if (!bus)
+		return -ENOMEM;
+	ret = pt3_qm_init(adap->qm, bus);
+	if (ret) {
+		vfree(bus);
+		return ret;
+	}
+	pt3_bus_end(bus);
+	ret = pt3_i2c_run(i2c, bus, true);
+	vfree(bus);
+	if (ret) {
+		pr_debug("fail pt3_qm_tuner_init qm init ret=%d\n", ret);
+		return ret;
+	}
+	return ret;
+}
+
 int pt3_qm_set_sleep(struct pt3_qm *qm, bool sleep)
 {
 	qm->standby = sleep;

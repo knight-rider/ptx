@@ -1,33 +1,26 @@
 #include "pt3.h"
 
-#define PT3_DMA_DESC_SIZE	20
-#define PT3_DMA_PAGE_SIZE	4096
-#define PT3_DMA_MAX_DESCS	204	/* 4096 / 20 */
+#define PT3_DMA_MAX_DESCS	204
+#define PT3_DMA_PAGE_SIZE	(PT3_DMA_MAX_DESCS * sizeof(struct pt3_dma_desc))
 #define PT3_DMA_BLOCK_COUNT	17
 #define PT3_DMA_BLOCK_SIZE	(PT3_DMA_PAGE_SIZE * 47)
 #define PT3_DMA_TS_BUF_SIZE	(PT3_DMA_BLOCK_SIZE * PT3_DMA_BLOCK_COUNT)
 #define PT3_DMA_NOT_SYNC_BYTE	0x74
 
-static void pt3_dma_link_descriptor(u64 next_addr, u8 *desc)
-{
-	*(u64 *)(desc + 0x0c) = next_addr | 0b10;	/* read next desc & continue */
-}
-
-static void pt3_dma_write_descriptor(u64 ts_addr, u32 size, u8 *desc)
-{
-	*(u64 *)(desc + 0x00) = ts_addr   | 0b111;	/* page addr */
-	*(u32 *)(desc + 0x08) = size      | 0b111;	/* page size */
-	*(u64 *)(desc + 0x0c) = 0b10;	/* read next desc & continue */
-}
+struct pt3_dma_desc {
+	u64 page_addr;
+	u32 page_size;
+	u64 next_desc;
+} __packed;
 
 void pt3_dma_build_page_descriptor(struct pt3_dma *dma)
 {
 	struct pt3_dma_page *desc_info, *ts_info;
 	u64 ts_addr, desc_addr;
 	u32 i, j, ts_size, desc_remain, ts_info_pos, desc_info_pos;
-	u8 *prev, *curr;
+	struct pt3_dma_desc *prev, *curr;
 
-	pr_debug("#%d build page descriptor ts_count=%d ts_size=0x%x desc_count=%d desc_size=0x%x\n",
+	pr_debug("#%d build page descriptor ts_count=%d ts_size=%d desc_count=%d desc_size=%d\n",
 		dma->adap->idx, dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
 	desc_info_pos = ts_info_pos = 0;
 	desc_info = &dma->desc_info[desc_info_pos];
@@ -35,7 +28,7 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma)
 	desc_remain = desc_info->size;
 	desc_info->data_pos = 0;
 	prev = NULL;
-	curr = &desc_info->data[desc_info->data_pos];
+	curr = (struct pt3_dma_desc *)&desc_info->data[desc_info->data_pos];
 	desc_info_pos++;
 
 	for (i = 0; i < dma->ts_count; i++) {
@@ -47,17 +40,17 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma)
 		ts_addr = ts_info->addr;
 		ts_size = ts_info->size;
 		ts_info_pos++;
-		pr_debug("#%d ts_info addr=0x%llx size=0x%x\n", dma->adap->idx, ts_addr, ts_size);
+		pr_debug("#%d i=%d, ts_info addr=0x%llx ts_size=%d\n", dma->adap->idx, i, ts_addr, ts_size);
 		for (j = 0; j < ts_size / PT3_DMA_PAGE_SIZE; j++) {
-			if (desc_remain < PT3_DMA_DESC_SIZE) {
+			if (desc_remain < sizeof(struct pt3_dma_desc)) {
 				if (unlikely(desc_info_pos >= dma->desc_count)) {
-					pr_debug("desc_info overflow max=%d curr=%d\n",
-						dma->desc_count, desc_info_pos);
+					pr_debug("#%d desc_info overflow max=%d curr=%d\n",
+						dma->adap->idx, dma->desc_count, desc_info_pos);
 					return;
 				}
 				desc_info = &dma->desc_info[desc_info_pos];
 				desc_info->data_pos = 0;
-				curr = &desc_info->data[desc_info->data_pos];
+				curr = (struct pt3_dma_desc *)&desc_info->data[desc_info->data_pos];
 				pr_debug("#%d desc_info_pos=%d ts_addr=0x%llx remain=%d\n",
 					dma->adap->idx, desc_info_pos, ts_addr, desc_remain);
 				desc_addr = desc_info->addr;
@@ -65,25 +58,87 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma)
 				desc_info_pos++;
 			}
 			if (prev)
-				pt3_dma_link_descriptor(desc_addr, prev);
-			pt3_dma_write_descriptor(ts_addr, PT3_DMA_PAGE_SIZE, curr);
-			pr_debug("#%d dma write desc ts_addr=0x%llx desc_info_pos=%d\n",
-				dma->adap->idx, ts_addr, desc_info_pos);
+				prev->next_desc = desc_addr | 0b10;
+			curr->page_addr = ts_addr           | 0b111;
+			curr->page_size = PT3_DMA_PAGE_SIZE | 0b111;
+			curr->next_desc = 0b10;
+			pr_debug("#%d j=%d dma write desc ts_addr=0x%llx desc_info_pos=%d desc_remain=%d\n",
+				dma->adap->idx, j, ts_addr, desc_info_pos, desc_remain);
 			ts_addr += PT3_DMA_PAGE_SIZE;
 
 			prev = curr;
-			desc_info->data_pos += PT3_DMA_DESC_SIZE;
-			if (unlikely(desc_info->data_pos >= desc_info->size)) {
-				pr_debug("dma desc_info data overflow.\n");
+			desc_info->data_pos += sizeof(struct pt3_dma_desc);
+			if (unlikely(desc_info->data_pos > desc_info->size)) {
+				pr_debug("#%d dma desc_info data overflow max=%d curr=%d\n",
+					dma->adap->idx, desc_info->size, desc_info->data_pos);
 				return;
 			}
-			curr = &desc_info->data[desc_info->data_pos];
-			desc_addr += PT3_DMA_DESC_SIZE;
-			desc_remain -= PT3_DMA_DESC_SIZE;
+			curr = (struct pt3_dma_desc *)&desc_info->data[desc_info->data_pos];
+			desc_addr += sizeof(struct pt3_dma_desc);
+			desc_remain -= sizeof(struct pt3_dma_desc);
 		}
 	}
 	if (prev)
-		pt3_dma_link_descriptor(dma->desc_info->addr, prev);
+		prev->next_desc = dma->desc_info->addr | 0b10;
+}
+
+struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
+{
+	struct pt3_dma_page *page;
+	u32 i;
+
+	struct pt3_dma *dma = kzalloc(sizeof(struct pt3_dma), GFP_KERNEL);
+	if (!dma) {
+		pr_debug("#%d fail allocate PT3_DMA\n", adap->idx);
+		goto fail;
+	}
+	dma->adap = adap;
+	dma->enabled = false;
+	mutex_init(&dma->lock);
+
+	dma->ts_count = PT3_DMA_BLOCK_COUNT;
+	dma->ts_info = kzalloc(sizeof(struct pt3_dma_page) * dma->ts_count, GFP_KERNEL);
+	if (!dma->ts_info) {
+		pr_debug("#%d fail allocate TS DMA page\n", adap->idx);
+		goto fail;
+	}
+	pr_debug("#%d Alloc TS buf (ts_count %d)\n", adap->idx, dma->ts_count);
+	for (i = 0; i < dma->ts_count; i++) {
+		page = &dma->ts_info[i];
+		page->size = PT3_DMA_BLOCK_SIZE;
+		page->data_pos = 0;
+		page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr);
+		if (!page->data) {
+			pr_debug("#%d fail alloc_consistent. %d\n", adap->idx, i);
+			goto fail;
+		}
+	}
+
+	dma->desc_count = 1 + (PT3_DMA_TS_BUF_SIZE / PT3_DMA_PAGE_SIZE - 1) / PT3_DMA_MAX_DESCS;
+	dma->desc_info = kzalloc(sizeof(struct pt3_dma_page) * dma->desc_count, GFP_KERNEL);
+	if (!dma->desc_info) {
+		pr_debug("#%d fail allocate Desc DMA page\n", adap->idx);
+		goto fail;
+	}
+	pr_debug("#%d Alloc Descriptor buf (desc_count %d)\n", adap->idx, dma->desc_count);
+	for (i = 0; i < dma->desc_count; i++) {
+		page = &dma->desc_info[i];
+		page->size = PT3_DMA_PAGE_SIZE;
+		page->data_pos = 0;
+		page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr);
+		if (!page->data) {
+			pr_debug("#%d fail alloc_consistent %d\n", adap->idx, i);
+			goto fail;
+		}
+	}
+
+	pr_debug("#%d build page descriptor\n", adap->idx);
+	pt3_dma_build_page_descriptor(dma);
+	return dma;
+fail:
+	if (dma)
+		pt3_dma_free(dma);
+	return NULL;
 }
 
 void pt3_dma_free(struct pt3_dma *dma)
@@ -108,65 +163,6 @@ void pt3_dma_free(struct pt3_dma *dma)
 		kfree(dma->desc_info);
 	}
 	kfree(dma);
-}
-
-struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
-{
-	struct pt3_dma_page *page;
-	u32 i;
-
-	struct pt3_dma *dma = kzalloc(sizeof(struct pt3_dma), GFP_KERNEL);
-	if (!dma) {
-		pr_debug("#%d fail allocate PT3_DMA\n", adap->idx);
-		goto fail;
-	}
-	dma->adap = adap;
-	dma->enabled = false;
-	mutex_init(&dma->lock);
-
-	dma->ts_count = PT3_DMA_BLOCK_COUNT;
-	dma->ts_info = kzalloc(sizeof(struct pt3_dma_page) * dma->ts_count, GFP_KERNEL);
-	if (!dma->ts_info) {
-		pr_debug("#%d fail allocate PT3_DMA_PAGE\n", adap->idx);
-		goto fail;
-	}
-	pr_debug("#%d Alloc TS buf (ts_count %d)\n", adap->idx, dma->ts_count);
-	for (i = 0; i < dma->ts_count; i++) {
-		page = &dma->ts_info[i];
-		page->size = PT3_DMA_BLOCK_SIZE;
-		page->data_pos = 0;
-		page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr);
-		if (!page->data) {
-			pr_debug("#%d fail allocate consistent. %d\n", adap->idx, i);
-			goto fail;
-		}
-	}
-
-	dma->desc_count = (PT3_DMA_TS_BUF_SIZE / PT3_DMA_PAGE_SIZE + PT3_DMA_MAX_DESCS - 1) / PT3_DMA_MAX_DESCS;
-	dma->desc_info = kzalloc(sizeof(struct pt3_dma_page) * dma->desc_count, GFP_KERNEL);
-	if (!dma->desc_info) {
-		pr_debug("#%d fail allocate PT3_DMA_PAGE\n", adap->idx);
-		goto fail;
-	}
-	pr_debug("#%d Alloc Descriptor buf (desc_count %d)\n", adap->idx, dma->desc_count);
-	for (i = 0; i < dma->desc_count; i++) {
-		page = &dma->desc_info[i];
-		page->size = PT3_DMA_PAGE_SIZE;
-		page->data_pos = 0;
-		page->data = pci_alloc_consistent(adap->pt3->pdev, page->size, &page->addr);
-		if (!page->data) {
-			pr_debug("#%d fail allocate consistent %d\n", adap->idx, i);
-			goto fail;
-		}
-	}
-
-	pr_debug("#%d set page descriptor\n", adap->idx);
-	pt3_dma_build_page_descriptor(dma);
-	return dma;
-fail:
-	if (dma)
-		pt3_dma_free(dma);
-	return NULL;
 }
 
 void __iomem *pt3_dma_get_base_addr(struct pt3_dma *dma)
@@ -257,8 +253,8 @@ bool pt3_dma_ready(struct pt3_dma *dma)
 	if (*p == PT3_DMA_NOT_SYNC_BYTE)
 		return false;
 
-	pr_debug("invalid sync byte value=0x%02x ts_pos=%d data_pos=%d curr=0x%02x\n",
-			*p, next, page->data_pos, dma->ts_info[dma->ts_pos].data[0]);
+	pr_debug("#%d invalid sync byte value=0x%02x ts_pos=%d data_pos=%d curr=0x%02x\n",
+		dma->adap->idx, *p, next, page->data_pos, dma->ts_info[dma->ts_pos].data[0]);
 	return false;
 }
 

@@ -34,16 +34,7 @@ static int lnb = 2;	/* used if not set by frontend / the value is invalid */
 module_param(lnb, int, 0);
 MODULE_PARM_DESC(lnb, "LNB level (0:OFF 1:+11V 2:+15V)");
 
-struct pt3_dma_page {
-	dma_addr_t addr;
-	u8 *data;
-	u32 size, data_pos;
-};
-
-struct pt3_i2c {
-	u8 __iomem *reg[2];
-	struct mutex lock;
-};
+/* Transmission and Multiplexing Configuration Control */
 
 enum {
 	LAYER_INDEX_L = 0,
@@ -58,8 +49,6 @@ enum {
 	LAYER_COUNT_S = LAYER_INDEX_H + 1,
 	LAYER_COUNT_T = LAYER_INDEX_C + 1,
 };
-
-/* Transmission and Multiplexing Configuration Control */
 
 struct tmcc_s {
 	u32 indicator;
@@ -80,6 +69,17 @@ struct tmcc_t {
 	u32 rate[LAYER_COUNT_T];
 	u32 interleave[LAYER_COUNT_T];
 	u32 segment[LAYER_COUNT_T];
+};
+
+struct pt3_i2c {
+	u8 __iomem *reg[2];
+	struct mutex lock;
+};
+
+struct pt3_dma_page {
+	dma_addr_t addr;
+	u8 *data;
+	u32 size, data_pos;
 };
 
 struct pt3_adapter;
@@ -213,11 +213,9 @@ int pt3_tc_write_tuner(struct pt3_adapter *adap, struct pt3_bus *bus, u8 addr, c
 int pt3_tc_write_tuner_without_addr(struct pt3_adapter *adap, struct pt3_bus *bus, const u8 *data, u32 size);
 int pt3_mx_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset);
 int pt3_mx_set_sleep(struct pt3_adapter *adap, bool sleep);
-void pt3_qm_dummy_reset(struct pt3_qm *qm, struct pt3_bus *bus);
-void pt3_qm_init_reg_param(struct pt3_qm *qm);
-int pt3_qm_init(struct pt3_qm *qm, struct pt3_bus *bus);
 int pt3_qm_set_frequency(struct pt3_qm *qm, u32 channel);
 int pt3_qm_set_sleep(struct pt3_qm *qm, bool sleep);
+int pt3_qm_tuner_init(struct pt3_i2c *i2c, struct pt3_adapter *adap);
 struct dvb_frontend *pt3_fe_s_attach(struct pt3_adapter *adap);
 struct dvb_frontend *pt3_fe_t_attach(struct pt3_adapter *adap);
 
