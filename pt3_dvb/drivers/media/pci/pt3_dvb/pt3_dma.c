@@ -33,7 +33,7 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma)
 
 	for (i = 0; i < dma->ts_count; i++) {
 		if (unlikely(ts_info_pos >= dma->ts_count)) {
-			pr_debug("ts_info overflow max=%d curr=%d\n", dma->ts_count, ts_info_pos);
+			pr_debug("#%d ts_info overflow max=%d curr=%d\n", dma->adap->idx, dma->ts_count, ts_info_pos);
 			return;
 		}
 		ts_info = &dma->ts_info[ts_info_pos];
@@ -172,14 +172,14 @@ void __iomem *pt3_dma_get_base_addr(struct pt3_dma *dma)
 
 void pt3_dma_reset(struct pt3_dma *dma)
 {
-	struct pt3_dma_page *page;
+	struct pt3_dma_page *ts;
 	u32 i;
 
 	for (i = 0; i < dma->ts_count; i++) {
-		page = &dma->ts_info[i];
-		memset(page->data, 0, page->size);
-		page->data_pos = 0;
-		*page->data = PT3_DMA_NOT_SYNC_BYTE;
+		ts = &dma->ts_info[i];
+		memset(ts->data, 0, ts->size);
+		ts->data_pos = 0;
+		*ts->data = PT3_DMA_NOT_SYNC_BYTE;
 	}
 	dma->ts_pos = 0;
 }
@@ -192,15 +192,15 @@ void pt3_dma_set_enabled(struct pt3_dma *dma, bool enabled)
 	if (enabled) {
 		pr_debug("#%d DMA enable start_addr=%llx\n", dma->adap->idx, start_addr);
 		pt3_dma_reset(dma);
-		writel(1 << 1, base + REG_DMA_CTL);
+		writel(1 << 1, base + REG_DMA_CTL);	/* stop DMA */
 		writel(PT3_SHIFT_MASK(start_addr,  0, 32), base + REG_DMA_DESC_L);
 		writel(PT3_SHIFT_MASK(start_addr, 32, 32), base + REG_DMA_DESC_H);
 		pr_debug("set descriptor address low %llx\n",  PT3_SHIFT_MASK(start_addr,  0, 32));
 		pr_debug("set descriptor address high %llx\n", PT3_SHIFT_MASK(start_addr, 32, 32));
-		writel(1 << 0, base + REG_DMA_CTL);
+		writel(1 << 0, base + REG_DMA_CTL);	/* start DMA */
 	} else {
 		pr_debug("#%d DMA disable\n", dma->adap->idx);
-		writel(1 << 1, base + REG_DMA_CTL);
+		writel(1 << 1, base + REG_DMA_CTL);	/* stop DMA */
 		while (1) {
 			if (!PT3_SHIFT_MASK(readl(base + REG_STATUS), 0, 1))
 				break;
@@ -239,14 +239,14 @@ void pt3_dma_set_test_mode(struct pt3_dma *dma, enum pt3_dma_mode mode, u16 init
 
 bool pt3_dma_ready(struct pt3_dma *dma)
 {
-	struct pt3_dma_page *page;
+	struct pt3_dma_page *ts;
 	u8 *p;
 
 	u32 next = dma->ts_pos + 1;
 	if (next >= dma->ts_count)
 		next = 0;
-	page = &dma->ts_info[next];
-	p = &page->data[page->data_pos];
+	ts = &dma->ts_info[next];
+	p = &ts->data[ts->data_pos];
 
 	if (*p == 0x47)
 		return true;
@@ -254,20 +254,20 @@ bool pt3_dma_ready(struct pt3_dma *dma)
 		return false;
 
 	pr_debug("#%d invalid sync byte value=0x%02x ts_pos=%d data_pos=%d curr=0x%02x\n",
-		dma->adap->idx, *p, next, page->data_pos, dma->ts_info[dma->ts_pos].data[0]);
+		dma->adap->idx, *p, next, ts->data_pos, dma->ts_info[dma->ts_pos].data[0]);
 	return false;
 }
 
-ssize_t pt3_dma_copy(struct pt3_dma *dma, struct dvb_demux *demux, loff_t *ppos)
+ssize_t pt3_dma_copy(struct pt3_dma *dma, struct dvb_demux *demux)
 {
 	bool ready;
-	struct pt3_dma_page *page;
+	struct pt3_dma_page *ts;
 	u32 i, prev;
 	size_t csize, remain = dma->ts_info[dma->ts_pos].size;
 
 	mutex_lock(&dma->lock);
-	pr_debug("#%d dma_copy ts_pos=0x%x data_pos=0x%x ppos=0x%x\n",
-		   dma->adap->idx, dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos, (int)(*ppos));
+	pr_debug("#%d dma_copy ts_pos=0x%x data_pos=0x%x\n",
+		   dma->adap->idx, dma->ts_pos, dma->ts_info[dma->ts_pos].data_pos);
 	for (;;) {
 		for (i = 0; i < 20; i++) {
 			ready = pt3_dma_ready(dma);
@@ -285,17 +285,16 @@ ssize_t pt3_dma_copy(struct pt3_dma *dma, struct dvb_demux *demux, loff_t *ppos)
 		if (dma->ts_info[prev].data[0] != PT3_DMA_NOT_SYNC_BYTE)
 			pr_debug("#%d DMA buffer overflow. prev=%d data=0x%x\n",
 					dma->adap->idx, prev, dma->ts_info[prev].data[0]);
-		page = &dma->ts_info[dma->ts_pos];
+		ts = &dma->ts_info[dma->ts_pos];
 		for (;;) {
-			csize = (remain < (page->size - page->data_pos)) ?
-				 remain : (page->size - page->data_pos);
-			dvb_dmx_swfilter(demux, &page->data[page->data_pos], csize);
-			*ppos += csize;
+			csize = (remain < (ts->size - ts->data_pos)) ?
+				 remain : (ts->size - ts->data_pos);
+			pt3_filter(dma->adap, demux, &ts->data[ts->data_pos], csize);
 			remain -= csize;
-			page->data_pos += csize;
-			if (page->data_pos >= page->size) {
-				page->data_pos = 0;
-				page->data[page->data_pos] = PT3_DMA_NOT_SYNC_BYTE;
+			ts->data_pos += csize;
+			if (ts->data_pos >= ts->size) {
+				ts->data_pos = 0;
+				ts->data[ts->data_pos] = PT3_DMA_NOT_SYNC_BYTE;
 				dma->ts_pos++;
 				if (dma->ts_pos >= dma->ts_count)
 					dma->ts_pos = 0;

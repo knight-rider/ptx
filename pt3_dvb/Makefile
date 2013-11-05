@@ -1,6 +1,6 @@
 TARGET := pt3_dvb.ko
-DIRS = drivers/media/pci/pt3_dvb/
-SRCS = pt3.c pt3.h pt3_dma.c pt3_bus.c pt3_i2c.c pt3_tc.c pt3_fe.c
+DIR1 = drivers/media/pci/pt3_dvb/
+SRC1 = pt3_dma.c pt3_bus.c pt3_i2c.c pt3_tc.c pt3_fe.c pt3.h pt3.c
 
 KVER ?= `uname -r`
 KBUILD = /lib/modules/$(KVER)/build
@@ -11,19 +11,19 @@ EXTRA_CFLAGS += -Wformat=2 -Wall -Werror -DDEBUG -Idrivers/media/dvb-core -Idriv
 
 all: ${TARGET}
 
-%.ko: $(addprefix $(DIRS), $(SRCS))
+%.ko: $(addprefix $(DIR1), $(SRC1))
 	make -C $(KBUILD) M=`pwd` V=$(VERBOSITY) modules
 
 
 obj-m := $(basename $(TARGET)).o
 
-$(basename $(TARGET))-objs := $(addprefix $(DIRS), $(filter %.o, $(SRCS:.c=.o)))
+$(basename $(TARGET))-objs := $(addprefix $(DIR1), $(filter %.o, $(SRC1:.c=.o)))
 
 clean:
 	make -C $(KBUILD) M=`pwd` V=$(VERBOSITY) clean
 
 clean-files := *.o *.ko *.mod.[co] *~
-clean-files += $(addprefix $(DIRS), $(clean-files))
+clean-files += $(addprefix $(DIR1), $(clean-files))
 
 uninstall:
 	rm -vf $(INSTALL_DIR)/$(TARGET)*

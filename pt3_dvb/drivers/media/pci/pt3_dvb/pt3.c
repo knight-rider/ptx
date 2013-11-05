@@ -12,33 +12,6 @@ MODULE_DEVICE_TABLE(pci, pt3_id_table);
 
 #define DRV_NAME "pt3_dvb"
 
-static int pt3_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset)
-{
-	int ret;
-
-	pr_debug("#%d %s set_freq channel=%d offset=%d\n", adap->idx, adap->str, channel, offset);
-
-	if (adap->type == SYS_ISDBS)
-		ret = pt3_qm_set_frequency(adap->qm, channel);
-	else
-		ret = pt3_mx_set_frequency(adap, channel, offset);
-	return ret;
-}
-
-static int pt3_set_tuner_sleep(struct pt3_adapter *adap, bool sleep)
-{
-	int ret;
-
-	pr_debug("#%d %p %s %s\n", adap->idx, adap, adap->str, sleep ? "Sleep" : "Wakeup");
-
-	if (adap->type == SYS_ISDBS)
-		ret = pt3_qm_set_sleep(adap->qm, sleep);
-	else
-		ret = pt3_mx_set_sleep(adap, sleep);
-	msleep_interruptible(10);
-	return ret;
-}
-
 struct {
 	u32 bits;
 	char *str;
@@ -82,16 +55,20 @@ static int pt3_update_lnb(struct pt3_board *pt3)
 	return 0;
 }
 
+void pt3_filter(struct pt3_adapter *adap, struct dvb_demux *demux, u8 *buf, size_t count)
+{
+	dvb_dmx_swfilter(demux, buf, count);
+}
+
 int pt3_thread(void *data)
 {
 	size_t ret;
 	struct pt3_adapter *adap = data;
-	loff_t ppos = 0;
 
 	set_freezable();
 	while (!kthread_should_stop()) {
 		try_to_freeze();
-		while ((ret = pt3_dma_copy(adap->dma, &adap->demux, &ppos)) > 0)
+		while ((ret = pt3_dma_copy(adap->dma, &adap->demux)) > 0)
 			;
 		if (ret < 0) {
 			pr_debug("#%d fail dma_copy\n", adap->idx);
@@ -256,7 +233,7 @@ static int pt3_tuner_power_on(struct pt3_board *pt3, struct pt3_bus *bus)
 				msleep_interruptible(1);
 			}
 			if (ret) {
-				pr_debug("fail pt3_qm_tuner_init %d ret=0x%x\n", i, ret);
+				pr_debug("#%d fail pt3_qm_tuner_init ret=0x%x\n", i, ret);
 				goto last;
 			}
 		}
@@ -303,13 +280,13 @@ static int pt3_tuner_init_all(struct pt3_board *pt3)
 
 	for (i = 0; i < PT3_NR_ADAPS; i++) {
 		struct pt3_adapter *adap = pt3->adap[i];
-		ret = pt3_set_tuner_sleep(adap, false);
+		ret = pt3_fe_tuner_sleep(adap, false);
 		if (ret)
 			goto last;
-		ret = pt3_set_frequency(adap, adap->init_ch, 0);
+		ret = pt3_fe_set_freq(adap, adap->init_ch, 0);
 		if (ret)
 			pr_debug("fail set_frequency, ret=%d\n", ret);
-		ret = pt3_set_tuner_sleep(adap, true);
+		ret = pt3_fe_tuner_sleep(adap, true);
 		if (ret)
 			goto last;
 	}
@@ -327,7 +304,7 @@ static void pt3_cleanup_adapter(struct pt3_adapter *adap)
 	if (adap->fe)
 		dvb_unregister_frontend(adap->fe);
 	if (!adap->sleep)
-		pt3_set_tuner_sleep(adap, true);
+		pt3_fe_tuner_sleep(adap, true);
 	if (adap->qm)
 		vfree(adap->qm);
 	if (adap->dma) {
@@ -546,13 +523,10 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pt3->i2c->reg[0] = pt3->reg[0];
 	pt3->i2c->reg[1] = pt3->reg[1];
 
-	ret = pt3_tuner_init_all(pt3);
-	if (ret)
+	if (pt3_tuner_init_all(pt3))
 		return pt3_abort(pdev, ret, "Failed pt3_tuner_init_all\n");
 	ret = pt3_init_frontends(pt3);
-	if (ret < 0)
-		return pt3_abort(pdev, ret, "Failed pt3_init_frontends\n");
-	return ret;
+	return (ret >= 0) ? ret : pt3_abort(pdev, ret, "Failed pt3_init_frontends\n");
 }
 
 static struct pci_driver pt3_driver = {

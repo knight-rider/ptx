@@ -704,6 +704,33 @@ int pt3_mx_set_frequency(struct pt3_adapter *adap, u32 channel, s32 offset)
 	return (!pt3_mx_locked(adap)) ? -ETIMEDOUT : pt3_tc_set_agc_t(adap, PT3_TC_AGC_AUTO);
 }
 
+int pt3_fe_set_freq(struct pt3_adapter *adap, u32 channel, s32 offset)
+{
+	int ret;
+
+	pr_debug("#%d %s set_freq channel=%d offset=%d\n", adap->idx, adap->str, channel, offset);
+
+	if (adap->type == SYS_ISDBS)
+		ret = pt3_qm_set_frequency(adap->qm, channel);
+	else
+		ret = pt3_mx_set_frequency(adap, channel, offset);
+	return ret;
+}
+
+int pt3_fe_tuner_sleep(struct pt3_adapter *adap, bool sleep)
+{
+	int ret;
+
+	pr_debug("#%d %p %s %s\n", adap->idx, adap, adap->str, sleep ? "Sleep" : "Wakeup");
+
+	if (adap->type == SYS_ISDBS)
+		ret = pt3_qm_set_sleep(adap->qm, sleep);
+	else
+		ret = pt3_mx_set_sleep(adap, sleep);
+	msleep_interruptible(10);
+	return ret;
+}
+
 /**** ISDB-S ****/
 
 enum pt3_fe_s_tune_state {
