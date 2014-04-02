@@ -40,9 +40,7 @@ clean-files += \
 uninstall:
 	rm -vf $(INSTALL_DIR)/$(TARGET)*
 
-dkms: all
-
-install: uninstall dkms
+install: uninstall all
 	install -d $(INSTALL_DIR)
 	install -m 644 $(TARGET) $(INSTALL_DIR)
 	depmod -a $(KVER)
