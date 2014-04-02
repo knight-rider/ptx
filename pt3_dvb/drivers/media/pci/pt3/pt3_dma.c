@@ -1,11 +1,52 @@
-#include "pt3.h"
+/*
+ * DVB driver for Earthsoft PT3 ISDB-S/T PCI-E card
+ *
+ * Copyright (C) 2013 Budi Rachmanto, AreMa Inc. <info@are.ma>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "pt3_dma.h"
 
 #define PT3_DMA_MAX_DESCS	204
 #define PT3_DMA_PAGE_SIZE	(PT3_DMA_MAX_DESCS * sizeof(struct pt3_dma_desc))
 #define PT3_DMA_BLOCK_COUNT	17
 #define PT3_DMA_BLOCK_SIZE	(PT3_DMA_PAGE_SIZE * 47)
 #define PT3_DMA_TS_BUF_SIZE	(PT3_DMA_BLOCK_SIZE * PT3_DMA_BLOCK_COUNT)
-#define PT3_DMA_NOT_SYNC_BYTE	0x74
+#define PT3_DMA_TS_SYNC		0x47
+#define PT3_DMA_TS_NOT_SYNC	0x74
+
+void pt3_dma_free(struct pt3_dma *dma)
+{
+	struct pt3_dma_page *page;
+	u32 i;
+
+	if (dma->ts_info) {
+		for (i = 0; i < dma->ts_count; i++) {
+			page = &dma->ts_info[i];
+			if (page->data)
+				pci_free_consistent(dma->adap->pt3->pdev, page->size, page->data, page->addr);
+		}
+		kfree(dma->ts_info);
+	}
+	if (dma->desc_info) {
+		for (i = 0; i < dma->desc_count; i++) {
+			page = &dma->desc_info[i];
+			if (page->data)
+				pci_free_consistent(dma->adap->pt3->pdev, page->size, page->data, page->addr);
+		}
+		kfree(dma->desc_info);
+	}
+	kfree(dma);
+}
 
 struct pt3_dma_desc {
 	u64 page_addr;
@@ -20,8 +61,8 @@ void pt3_dma_build_page_descriptor(struct pt3_dma *dma)
 	u32 i, j, ts_size, desc_remain, ts_info_pos, desc_info_pos;
 	struct pt3_dma_desc *prev, *curr;
 
-	pr_debug("#%d build page descriptor ts_count=%d ts_size=%d desc_count=%d desc_size=%d\n",
-		dma->adap->idx, dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
+	pr_debug("#%d %s ts_count=%d ts_size=%d desc_count=%d desc_size=%d\n",
+		dma->adap->idx, __func__, dma->ts_count, dma->ts_info[0].size, dma->desc_count, dma->desc_info[0].size);
 	desc_info_pos = ts_info_pos = 0;
 	desc_info = &dma->desc_info[desc_info_pos];
 	desc_addr   = desc_info->addr;
@@ -141,33 +182,9 @@ fail:
 	return NULL;
 }
 
-void pt3_dma_free(struct pt3_dma *dma)
-{
-	struct pt3_dma_page *page;
-	u32 i;
-
-	if (dma->ts_info) {
-		for (i = 0; i < dma->ts_count; i++) {
-			page = &dma->ts_info[i];
-			if (page->data)
-				pci_free_consistent(dma->adap->pt3->pdev, page->size, page->data, page->addr);
-		}
-		kfree(dma->ts_info);
-	}
-	if (dma->desc_info) {
-		for (i = 0; i < dma->desc_count; i++) {
-			page = &dma->desc_info[i];
-			if (page->data)
-				pci_free_consistent(dma->adap->pt3->pdev, page->size, page->data, page->addr);
-		}
-		kfree(dma->desc_info);
-	}
-	kfree(dma);
-}
-
 void __iomem *pt3_dma_get_base_addr(struct pt3_dma *dma)
 {
-	return dma->adap->pt3->i2c->reg[0] + REG_BASE + (0x18 * dma->adap->idx);
+	return dma->adap->pt3->bar_reg + PT3_REG_BASE + (0x18 * dma->adap->idx);
 }
 
 void pt3_dma_reset(struct pt3_dma *dma)
@@ -179,7 +196,7 @@ void pt3_dma_reset(struct pt3_dma *dma)
 		ts = &dma->ts_info[i];
 		memset(ts->data, 0, ts->size);
 		ts->data_pos = 0;
-		*ts->data = PT3_DMA_NOT_SYNC_BYTE;
+		*ts->data = PT3_DMA_TS_NOT_SYNC;
 	}
 	dma->ts_pos = 0;
 }
@@ -192,17 +209,17 @@ void pt3_dma_set_enabled(struct pt3_dma *dma, bool enabled)
 	if (enabled) {
 		pr_debug("#%d DMA enable start_addr=%llx\n", dma->adap->idx, start_addr);
 		pt3_dma_reset(dma);
-		writel(1 << 1, base + REG_DMA_CTL);	/* stop DMA */
-		writel(PT3_SHIFT_MASK(start_addr,  0, 32), base + REG_DMA_DESC_L);
-		writel(PT3_SHIFT_MASK(start_addr, 32, 32), base + REG_DMA_DESC_H);
-		pr_debug("set descriptor address low %llx\n",  PT3_SHIFT_MASK(start_addr,  0, 32));
-		pr_debug("set descriptor address high %llx\n", PT3_SHIFT_MASK(start_addr, 32, 32));
-		writel(1 << 0, base + REG_DMA_CTL);	/* start DMA */
+		writel(1 << 1, base + PT3_REG_DMA_CTL);	/* stop DMA */
+		writel(start_addr         & 0xffffffff, base + PT3_REG_DMA_D_L);
+		writel((start_addr >> 32) & 0xffffffff, base + PT3_REG_DMA_D_H);
+		pr_debug("set descriptor address low %llx\n",  start_addr         & 0xffffffff);
+		pr_debug("set descriptor address high %llx\n", (start_addr >> 32) & 0xffffffff);
+		writel(1 << 0, base + PT3_REG_DMA_CTL);	/* start DMA */
 	} else {
 		pr_debug("#%d DMA disable\n", dma->adap->idx);
-		writel(1 << 1, base + REG_DMA_CTL);	/* stop DMA */
+		writel(1 << 1, base + PT3_REG_DMA_CTL);	/* stop DMA */
 		while (1) {
-			if (!PT3_SHIFT_MASK(readl(base + REG_STATUS), 0, 1))
+			if (!(readl(base + PT3_REG_STATUS) & 1))
 				break;
 			msleep_interruptible(1);
 		}
@@ -218,7 +235,7 @@ static u32 pt3_dma_gray2binary(u32 gray, u32 bit)
 	for (i = 0; i < bit; i++) {
 		k = 0;
 		for (j = i; j < bit; j++)
-			k = k ^ PT3_SHIFT_MASK(gray, j, 1);
+			k ^= (gray >> j) & 1;
 		binary |= k << i;
 	}
 	return binary;
@@ -226,15 +243,15 @@ static u32 pt3_dma_gray2binary(u32 gray, u32 bit)
 
 u32 pt3_dma_get_ts_error_packet_count(struct pt3_dma *dma)
 {
-	return pt3_dma_gray2binary(readl(pt3_dma_get_base_addr(dma) + REG_TS_ERR), 32);
+	return pt3_dma_gray2binary(readl(pt3_dma_get_base_addr(dma) + PT3_REG_TS_ERR), 32);
 }
 
 void pt3_dma_set_test_mode(struct pt3_dma *dma, enum pt3_dma_mode mode, u16 initval)
 {
 	void __iomem *base = pt3_dma_get_base_addr(dma);
 	u32 data = mode | initval;
-	pr_debug("set_test_mode base=%p data=0x%04x\n", base, data);
-	writel(data, base + REG_TS_CTL);
+	pr_debug("#%d %s base=%p data=0x%04x\n", dma->adap->idx, __func__, base, data);
+	writel(data, base + PT3_REG_TS_CTL);
 }
 
 bool pt3_dma_ready(struct pt3_dma *dma)
@@ -248,9 +265,9 @@ bool pt3_dma_ready(struct pt3_dma *dma)
 	ts = &dma->ts_info[next];
 	p = &ts->data[ts->data_pos];
 
-	if (*p == 0x47)
+	if (*p == PT3_DMA_TS_SYNC)
 		return true;
-	if (*p == PT3_DMA_NOT_SYNC_BYTE)
+	if (*p == PT3_DMA_TS_NOT_SYNC)
 		return false;
 
 	pr_debug("#%d invalid sync byte value=0x%02x ts_pos=%d data_pos=%d curr=0x%02x\n",
@@ -282,19 +299,19 @@ ssize_t pt3_dma_copy(struct pt3_dma *dma, struct dvb_demux *demux)
 		prev = dma->ts_pos - 1;
 		if (prev < 0 || dma->ts_count <= prev)
 			prev = dma->ts_count - 1;
-		if (dma->ts_info[prev].data[0] != PT3_DMA_NOT_SYNC_BYTE)
+		if (dma->ts_info[prev].data[0] != PT3_DMA_TS_NOT_SYNC)
 			pr_debug("#%d DMA buffer overflow. prev=%d data=0x%x\n",
 					dma->adap->idx, prev, dma->ts_info[prev].data[0]);
 		ts = &dma->ts_info[dma->ts_pos];
 		for (;;) {
 			csize = (remain < (ts->size - ts->data_pos)) ?
 				 remain : (ts->size - ts->data_pos);
-			pt3_filter(dma->adap, demux, &ts->data[ts->data_pos], csize);
+			dvb_dmx_swfilter(demux, &ts->data[ts->data_pos], csize);
 			remain -= csize;
 			ts->data_pos += csize;
 			if (ts->data_pos >= ts->size) {
 				ts->data_pos = 0;
-				ts->data[ts->data_pos] = PT3_DMA_NOT_SYNC_BYTE;
+				ts->data[ts->data_pos] = PT3_DMA_TS_NOT_SYNC;
 				dma->ts_pos++;
 				if (dma->ts_pos >= dma->ts_count)
 					dma->ts_pos = 0;
@@ -311,6 +328,6 @@ last:
 
 u32 pt3_dma_get_status(struct pt3_dma *dma)
 {
-	return readl(pt3_dma_get_base_addr(dma) + REG_STATUS);
+	return readl(pt3_dma_get_base_addr(dma) + PT3_REG_STATUS);
 }
 

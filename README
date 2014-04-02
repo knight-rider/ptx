@@ -2,7 +2,7 @@ PT3 用ツール集
 ============
 recpt1   : 録画ツール（stz2012版）
 pt3_drv  : chardev ドライバ
-pt3_dvb  : DVB ドライバ（β版）
+pt3_dvb  : DVB ドライバ（RC版）
 dvb_apps : DVB アプリ集
 
 周波数テーブルについては以下の値を参考にしてください(EARTH_PT.hより抜粋)
@@ -62,4 +62,21 @@ C24〜C27 は、ケーブルテレビ局により下記の周波数で送信さ�
 | C26 | 245+1/7 |
 | C27 | 251+1/7 |
 +-----+---------+
+
+I2C について：
+SDKとすり合わせて見ました。ほぼPT_Device.hのInitTunerと合致してますね。
+ただ、//LPF Tuning Onのところから関数が終わるまで(91,11,93,13で始まるやつ)
+SLEEPあるはずの場所にSLEEPが無い点がSDKと違うようです
+以下前提条件
+(START) = (I_DATA_H)(I_CLOCK_H)(I_DATA_L)(I_CLOCK_L)
+(STOP) = (I_DATA_L)(I_CLOCK_H)(I_DATA_H)
+addr_demod : S0 => 0x22, S1 => 0x26, T0 => 0x20, t1 => 0x24
+addr_tuner : S0 => 0xc6, S1 => 0xc0, T0 => 0xc4, t1 => 0xc2
+SDK的にはI2Cは以下の6パターン
+Write : (START), addr_demod, addr, data * size (STOP)
+WriteTuner : (START), addr_demod, 0xfe, addr_tuner , addr, data * size (STOP)
+WriteTunerWithoutAddress: (START), addr_demod, 0xfe, addr_tuner , data * size (STOP)
+Read : (START), addr_demod, addr, (START) , addr_demod | 1, [(READ) * 8, (LNOP)or(HNOP)] * size, (STOP)
+ReadTuner : (START), addr_demod, 0xfe, addr , (START) , addr_demod , 0xfe, addr_tuner | 1, (START), addr_demod | 1, [(READ) * 8, (LNOP)or(HNOP)] * size, (STOP)
+ReadTunerWithoutAddress : (START), addr_demod, 0xfe, addr_tuner | 1, (START) , addr_demod | 1, [(READ) * 8, (LNOP)or(HNOP)] * size, (STOP)
 

@@ -1,0 +1,40 @@
+DVB driver for Earthsoft PT3 (ISDB-S/T) receiver PCI Express cards.
+It behaves similarly as PT1 DVB, plus some tuning enhancements:
+1. in addition to the real frequency:
+	ISDB-S : freq. channel ID
+	ISDB-T : freq# (I/O# +128), ch#, ch# +64 for CATV
+2. in addition to TSID:
+	ISDB-S : slot#
+
+Feature changes:
+- dropped DKMS & standalone compile
+- dropped verbosity (debug levels), use single level -DDEBUG instead
+- changed SNR (.read_snr) to CNR (.read_signal_strength)
+- moved demodulator FE to drivers/media/dvb-frontends
+- moved tuners to drivers/media/tuners
+- translated to standard (?) I2C protocol
+- dropped FE's LNB control & other unused features
+- added DVBv5 stats support (only CNRs)
+
+The full package (buildable as standalone, DKMS or tree embedded module) is available at
+https://github.com/knight-rider/ptx/tree/master/pt3_dvb
+
+--------------------------------------------------------------------------------
+
+Mauro stated:
+- We reserve uppercase for defines only.
+- Please split the struct definition from the table itself
+- Please put "const" on all tables, as otherwise gcc may not store it as a table, but, instead, to convert it into code.
+- We generally use lowcases for hexadecimal values.
+- You shouldn't use gettimeofday(), nor define your own timediff logic. Use jiffies and time_before/time_after instead.
+
+MY WISHLIST: Can you add these rules to checkpatch.pl?
+
+--------------------------------------------------------------------------------
+
+Why do you need a thread on this driver?
+I'll need to revisit this driver, after you do the changes requested by
+tuner/frontend proper API usage.
+
+Mauro
+

@@ -7,7 +7,7 @@ obj-y        +=	ttpci/		\
 		pluto2/		\
 		dm1105/		\
 		pt1/		\
-		pt3_dvb/	\
+		pt3/		\
 		mantis/		\
 		ngene/		\
 		ddbridge/	\
