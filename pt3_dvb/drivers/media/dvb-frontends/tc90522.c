@@ -311,7 +311,7 @@ int tc90522_read_status(struct dvb_frontend *fe, fe_status_t *status)
 
 	c->cnr.stat[0].svalue = demod->type == SYS_ISDBS ? tc90522_get_cn_s(raw) : tc90522_get_cn_t(raw);
 	c->cnr.stat[0].scale = FE_SCALE_DECIBEL;
-	return ret;
+	return ret < 0 ? ret : 0;
 }
 
 /**** ISDB-S ****/
