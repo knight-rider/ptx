@@ -19,22 +19,3 @@ Feature changes:
 The full package (buildable as standalone, DKMS or tree embedded module) is available at
 https://github.com/knight-rider/ptx/tree/master/pt3_dvb
 
---------------------------------------------------------------------------------
-
-Mauro stated:
-- We reserve uppercase for defines only.
-- Please split the struct definition from the table itself
-- Please put "const" on all tables, as otherwise gcc may not store it as a table, but, instead, to convert it into code.
-- We generally use lowcases for hexadecimal values.
-- You shouldn't use gettimeofday(), nor define your own timediff logic. Use jiffies and time_before/time_after instead.
-
-MY WISHLIST: Can you add these rules to checkpatch.pl?
-
---------------------------------------------------------------------------------
-
-Why do you need a thread on this driver?
-I'll need to revisit this driver, after you do the changes requested by
-tuner/frontend proper API usage.
-
-Mauro
-
