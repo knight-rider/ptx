@@ -61,14 +61,14 @@ typedef struct splitter {
 	uint8_t packet_seq[MAX_PID];	// 巡回カウンタ
 } splitter;
 
-/* b25 decoder would hoard up large chank */
+/* b25 decoder would hoard up large chunk */
 typedef struct _splitbuf_t
 {
     int size;
     u_char *buffer;
 } splitbuf_t;
 
-splitter* split_startup(char *sid);
+splitter *split_startup(char *sid);
 int split_select(splitter *sp, ARIB_STD_B25_BUFFER *sbuf);
 void split_shutdown(splitter *sp);
 int split_ts(splitter *splitter, ARIB_STD_B25_BUFFER *sbuf, splitbuf_t *dbuf);

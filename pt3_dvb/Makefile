@@ -15,6 +15,9 @@ EXTRA_CFLAGS += -Wformat=2 -Wall -Werror -Idrivers/media/dvb-core -Idrivers/medi
 
 all: ${TARGET}
 
+debug:
+	make "EXTRA_CFLAGS += -DDEBUG $(EXTRA_CFLAGS)" -C $(KBUILD) M=`pwd` modules
+
 $(basename $(TARGET)).ko: \
 	$(addprefix $(DIR1), $(SRC1)) \
 	$(addprefix $(DIR2), $(SRC2)) \

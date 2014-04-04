@@ -19,3 +19,5 @@ Feature changes:
 The full package (buildable as standalone, DKMS or tree embedded module) is available at
 https://github.com/knight-rider/ptx/tree/master/pt3_dvb
 
+複数枚同時装着での動作は未検証です。どなたか、ボード等環境を提供して頂ければ幸いですが。
+
