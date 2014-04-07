@@ -1,33 +1,23 @@
-DIR1 = drivers/media/pci/pt3/
-SRC1 = pt3_pci.c pt3_common.h pt3_dma.c pt3_dma.h pt3_i2c.c pt3_i2c.h
-DIR2 = drivers/media/dvb-frontends/
-SRC2 = tc90522.c tc90522.h
-DIR3 = drivers/media/tuners/
-SRC3 = mxl301rf.c mxl301rf.h qm1d1c0042.c qm1d1c0042.h
+DEFS := -DCONFIG_DVB_TC90522 -DCONFIG_MEDIA_TUNER_QM1D1C0042 -DCONFIG_MEDIA_TUNER_MXL301RF
 
+SRCS := $(shell cd $(PWD); find -iname "*.c" -o -iname "*.h")
+DIRS := $(dir $(SRCS))
+INCS := $(addprefix -I$(PWD)/, $(DIRS))
 TARGET := $(shell eval `sed -e "s/\[0\]//" $(PWD)/dkms.conf`; echo $${PACKAGE_NAME}).ko
 KVER ?= `uname -r`
 KBUILD := /lib/modules/$(KVER)/build
 INSTALL_DIR := /lib/modules/$(KVER)/$(shell eval `sed -e "s/\[0\]//" $(PWD)/dkms.conf`; echo $${DEST_MODULE_LOCATION})
-EXTRA_CFLAGS += -Wformat=2 -Wall -Werror -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends \
-	-I$(PWD)/$(DIR1) -I$(PWD)/$(DIR2) -I$(PWD)/$(DIR3) \
-	-DCONFIG_DVB_TC90522 -DCONFIG_MEDIA_TUNER_QM1D1C0042 -DCONFIG_MEDIA_TUNER_MXL301RF
+EXTRA_CFLAGS += -Wformat=2 -Wall -Werror -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends $(INCS) $(DEFS)
 
 all: ${TARGET}
 
 debug:
 	make "EXTRA_CFLAGS += -DDEBUG $(EXTRA_CFLAGS)" -C $(KBUILD) M=`pwd` modules
 
-$(basename $(TARGET)).ko: \
-	$(addprefix $(DIR1), $(SRC1)) \
-	$(addprefix $(DIR2), $(SRC2)) \
-	$(addprefix $(DIR3), $(SRC3))
+$(basename $(TARGET)).ko: $(SRCS)
 	make -C $(KBUILD) M=`pwd` modules
 
-$(basename $(TARGET))-objs := \
-	$(addprefix $(DIR1), $(filter %.o, $(SRC1:.c=.o))) \
-	$(addprefix $(DIR2), $(filter %.o, $(SRC2:.c=.o))) \
-	$(addprefix $(DIR3), $(filter %.o, $(SRC3:.c=.o)))
+$(basename $(TARGET))-objs := $(filter %.o, $(SRCS:.c=.o))
 
 obj-m := $(basename $(TARGET)).o
 
@@ -35,10 +25,6 @@ clean:
 	make -C $(KBUILD) M=`pwd` clean
 
 clean-files := *.o *.ko *.mod.[co] *~
-clean-files += \
-	$(addprefix $(DIR1), $(clean-files)) \
-	$(addprefix $(DIR2), $(clean-files)) \
-	$(addprefix $(DIR3), $(clean-files))
 
 uninstall:
 	rm -vf $(INSTALL_DIR)/$(TARGET)*
