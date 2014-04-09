@@ -1,8 +1,7 @@
 DEFS := -DCONFIG_DVB_TC90522 -DCONFIG_MEDIA_TUNER_QM1D1C0042 -DCONFIG_MEDIA_TUNER_MXL301RF
 
 SRCS := $(shell cd $(PWD); find -iname "*.c" -o -iname "*.h")
-DIRS := $(dir $(SRCS))
-INCS := $(addprefix -I$(PWD)/, $(DIRS))
+INCS := $(addprefix -I$(PWD)/, $(sort $(dir $(SRCS))))
 TARGET := $(shell eval `sed -e "s/\[0\]//" $(PWD)/dkms.conf`; echo $${PACKAGE_NAME}).ko
 KVER ?= `uname -r`
 KBUILD := /lib/modules/$(KVER)/build
@@ -12,7 +11,7 @@ EXTRA_CFLAGS += -Wformat=2 -Wall -Werror -Idrivers/media/dvb-core -Idrivers/medi
 all: ${TARGET}
 
 debug:
-	make "EXTRA_CFLAGS += -DDEBUG $(EXTRA_CFLAGS)" -C $(KBUILD) M=`pwd` modules
+	make "EXTRA_CFLAGS += -DDEBUG $(EXTRA_CFLAGS)" -C $(KBUILD) M=`pwd`
 
 $(basename $(TARGET)).ko: $(SRCS)
 	make -C $(KBUILD) M=`pwd` modules
