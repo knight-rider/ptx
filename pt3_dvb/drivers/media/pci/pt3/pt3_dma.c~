@@ -254,6 +254,17 @@ void pt3_dma_set_test_mode(struct pt3_dma *dma, enum pt3_dma_mode mode, u16 init
 	writel(data, base + PT3_REG_TS_CTL);
 }
 
+void pt3_dma_tspat(u8 *p)
+{
+	u16 i, pid = ((p[1] & 0x1f) << 8) + p[2], section_length = (p[6] & 0x0f) + p[7];
+	if (pid)
+		return;		/* not a Program Association Table */
+	if (p[1] & 0x40)	/* Payload Unit Start Indicator */
+		p++;		/* add pointer field */
+	for (p += 12, i = 0; i < section_length - 9; i += 4, p += 4)
+		pr_debug("SID:PMT %04x:%04x\n", (*p << 8) + p[1], ((p[2] & 0x1f) << 8) + p[3]);
+}
+
 bool pt3_dma_ready(struct pt3_dma *dma)
 {
 	struct pt3_dma_page *ts;
@@ -265,8 +276,12 @@ bool pt3_dma_ready(struct pt3_dma *dma)
 	ts = &dma->ts_info[next];
 	p = &ts->data[ts->data_pos];
 
-	if (*p == PT3_DMA_TS_SYNC)
+	if (*p == PT3_DMA_TS_SYNC) {
+#ifdef DEBUG
+		pt3_dma_tspat(p);
+#endif
 		return true;
+	}
 	if (*p == PT3_DMA_TS_NOT_SYNC)
 		return false;
 
