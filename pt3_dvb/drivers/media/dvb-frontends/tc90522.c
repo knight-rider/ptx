@@ -367,14 +367,14 @@ int tc90522_tune_s(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 				tmcc.mode[0], tmcc.mode[1], tmcc.mode[2], tmcc.mode[3],
 				tmcc.id[0], tmcc.id[1], tmcc.id[2], tmcc.id[3],
 				tmcc.id[4], tmcc.id[5], tmcc.id[6], tmcc.id[7]);
-		for (i = 0; i < sizeof(tmcc.id)/sizeof(tmcc.id[0]); i++) {
+		for (i = 0; i < ARRAY_SIZE(tmcc.id); i++) {
 			pr_debug("tsid %x i %d tmcc.id %x\n", tsid, i, tmcc.id[i]);
 			if (tmcc.id[i] == tsid)
 				break;
 		}
-		if (tsid < sizeof(tmcc.id)/sizeof(tmcc.id[0]))	/* consider as slot# */
+		if (tsid < ARRAY_SIZE(tmcc.id))		/* treat as slot# */
 			i = tsid;
-		if (i == sizeof(tmcc.id)/sizeof(tmcc.id[0])) {
+		if (i == ARRAY_SIZE(tmcc.id)) {
 			pr_debug("#%d i%d tsid 0x%x not found\n", demod->idx, i, tsid);
 			return -EINVAL;
 		}

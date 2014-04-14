@@ -282,20 +282,15 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct dvb_frontend *fe[PT3_ADAPN];
 	int i, err, bars = pci_select_bars(pdev, IORESOURCE_MEM);
 
-	err = pci_enable_device(pdev);
+	err = pci_enable_device(pdev)					||
+		pci_set_dma_mask(pdev, DMA_BIT_MASK(64))		||
+		pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64))	||
+		pci_read_config_dword(pdev, PCI_CLASS_REVISION, &i)	||
+		pci_request_selected_regions(pdev, bars, DRV_NAME);
 	if (err)
-		return pt3_abort(pdev, err, "PCI device unusable\n");
-	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
-	if (err)
-		return pt3_abort(pdev, err, "DMA mask error\n");
-	pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
-
-	pci_read_config_dword(pdev, PCI_CLASS_REVISION, &i);
+		return pt3_abort(pdev, err, "PCI/DMA error\n");
 	if ((i & 0xFF) != 1)
-		return pt3_abort(pdev, err, "Revision 0x%x is not supported\n", i & 0xFF);
-	err = pci_request_selected_regions(pdev, bars, DRV_NAME);
-	if (err)
-		return pt3_abort(pdev, err, "Could not request regions\n");
+		return pt3_abort(pdev, -EINVAL, "Revision 0x%x is not supported\n", i & 0xFF);
 
 	pci_set_master(pdev);
 	err = pci_save_state(pdev);
