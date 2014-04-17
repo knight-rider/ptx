@@ -109,7 +109,8 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 	pr_debug("#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
 	if (!adap->users++) {
 		pr_debug("#%d %s selected, DMA %s\n",
-			adap->idx, (pt3_cfg[adap->idx].type == SYS_ISDBS) ? "S" : "T", pt3_dma_get_status(adap->dma) & 1 ? "ON" : "OFF");
+			adap->idx, (pt3_cfg[adap->idx].type == SYS_ISDBS) ? "S" : "T",
+			pt3_dma_get_status(adap->dma) & 1 ? "ON" : "OFF");
 		mutex_lock(&adap->lock);
 		if (!adap->kthread) {
 			adap->kthread = kthread_run(pt3_thread, adap, DRV_NAME "_%d", adap->idx);
@@ -355,7 +356,7 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		adap->orig_init        = fe[i]->ops.init;
 		fe[i]->ops.sleep       = pt3_sleep;
 		fe[i]->ops.init        = pt3_wakeup;
-		if ((adap->orig_init(fe[i]) && adap->orig_init(fe[i]) && adap->orig_init(fe[i]) && adap->orig_init(fe[i])) ||
+		if ((adap->orig_init(fe[i]) && adap->orig_init(fe[i]) && adap->orig_init(fe[i])) ||
 			adap->orig_sleep(fe[i]) || dvb_register_frontend(&adap->dvb, fe[i])) {
 			while (i--)
 				dvb_unregister_frontend(fe[i]);
