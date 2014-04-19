@@ -24,6 +24,7 @@ clean:
 	make -C $(KBUILD) M=`pwd` clean
 
 clean-files := *.o *.ko *.mod.[co] *~
+clean-files += $(foreach DIR, (sort $(dir $(SRCS))), $(addprefix $(DIR), $(clean-files)))
 
 uninstall:
 	rm -vf $(INSTALL_DIR)/$(TARGET)*
