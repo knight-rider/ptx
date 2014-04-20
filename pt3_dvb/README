@@ -14,7 +14,8 @@ Feature changes:
 - moved tuners to drivers/media/tuners
 - translated to standard (?) I2C protocol
 - dropped FE's LNB control & other unused features
-- added DVBv5 stats support (only CNRs)
+- added DVBv5 CNR support
+- improved CNR precision
 
 The full package (buildable as standalone, DKMS or tree embedded module) is available at
 https://github.com/knight-rider/ptx/tree/master/pt3_dvb

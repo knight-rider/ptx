@@ -241,25 +241,18 @@ s64 tc90522_get_cn_raw(struct tc90522 *demod)
 
 s64 tc90522_get_cn_s(s64 raw)	/* @ .0001 dB */
 {
-	s64 x1, x2, x3, x4, x5, y;
+	s64 x, y;
 
 	raw -= 3000;
 	if (raw < 0)
 		raw = 0;
-
-	x1 = int_sqrt(raw << 16) * ((12700ll << 21) / 1000000);
-	x2 = x1 * x1 >> 31;
-	x3 = x2 * x1 >> 31;
-	x4 = x2 * x2 >> 31;
-	x5 = x4 * x1 >> 31;
-
-	y = (58857ll << 23) / 1000;
-	y -= x1 * ((89565ll << 24) / 1000) >> 30;
-	y += x2 * ((88977ll << 24) / 1000) >> 28;
-	y -= x3 * ((50259ll << 25) / 1000) >> 27;
-	y += x4 * ((14341ll << 27) / 1000) >> 27;
-	y -= x5 * ((16346ll << 30) / 10000) >> 28;
-	return y < 0 ? 0 : y >> 10;
+	x = int_sqrt(raw << 20);
+	y = 16346ll * x - (143410ll << 16);
+	y = ((x * y) >> 16) + (502590ll << 16);
+	y = ((x * y) >> 16) - (889770ll << 16);
+	y = ((x * y) >> 16) + (895650ll << 16);
+	y = (588570ll << 16) - ((x * y) >> 16);
+	return y < 0 ? 0 : y >> 16;
 }
 
 s64 tc90522_get_cn_t(s64 raw)	/* @ .0001 dB */
@@ -267,14 +260,12 @@ s64 tc90522_get_cn_t(s64 raw)	/* @ .0001 dB */
 	s64 x, y;
 	if (!raw)
 		return 0;
-
-	x = 10 * (intlog10(0x69000000 / raw) - (2 << 24));
-	y = (24ll << 46) / 1000000;
-	y = (y * x >> 30) - (16ll << 40) / 10000;
-	y = (y * x >> 29) + (398ll << 35) / 10000;
-	y = (y * x >> 30) + (5491ll << 29) / 10000;
-	y = (y * x >> 30) + (30965ll << 23) / 10000;
-	return y >> 10;
+	x = (1130911733ll - 10ll * intlog10(raw)) >> 2;
+	y = (6ll * x / 25ll) - (16ll << 22);
+	y = ((x * y) >> 22) + (398ll << 22);
+	y = ((x * y) >> 22) + (5491ll << 22);
+	y = ((x * y) >> 22) + (30965ll << 22);
+	return y >> 22;
 }
 
 int tc90522_read_signal_strength(struct dvb_frontend *fe, u16 *cn)	/* raw C/N */
@@ -282,7 +273,7 @@ int tc90522_read_signal_strength(struct dvb_frontend *fe, u16 *cn)	/* raw C/N */
 	struct tc90522 *demod = fe->demodulator_priv;
 	s64 ret = tc90522_get_cn_raw(demod);
 	*cn = ret < 0 ? 0 : ret;
-	pr_debug("CN %d (%d dB)\n", (int)*cn, demod->type == SYS_ISDBS ? (int)tc90522_get_cn_s(*cn) : (int)tc90522_get_cn_t(*cn));
+	pr_debug("CN %d (%lld dB)\n", (int)*cn, demod->type == SYS_ISDBS ? (long long int)tc90522_get_cn_s(*cn) : (long long int)tc90522_get_cn_t(*cn));
 	return ret < 0 ? ret : 0;
 }
 
