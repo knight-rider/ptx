@@ -74,9 +74,10 @@ struct pt3_adapter {
 	struct dvb_adapter dvb;
 	struct dvb_demux demux;
 	struct dmxdev dmxdev;
-	int users;
+	int users, voltage;
 
 	struct dvb_frontend *fe;
+	int (*orig_voltage)(struct dvb_frontend *fe, fe_sec_voltage_t voltage);
 	int (*orig_sleep)(struct dvb_frontend *fe);
 	int (*orig_init)(struct dvb_frontend *fe);
 };

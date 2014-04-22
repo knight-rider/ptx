@@ -273,7 +273,7 @@ int tc90522_read_signal_strength(struct dvb_frontend *fe, u16 *cn)	/* raw C/N */
 	struct tc90522 *demod = fe->demodulator_priv;
 	s64 ret = tc90522_get_cn_raw(demod);
 	*cn = ret < 0 ? 0 : ret;
-	pr_debug("CN %d (%lld dB)\n", (int)*cn, demod->type == SYS_ISDBS ? (long long int)tc90522_get_cn_s(*cn) : (long long int)tc90522_get_cn_t(*cn));
+	pr_debug("v3 CN %d (%lld dB)\n", (int)*cn, demod->type == SYS_ISDBS ? (long long int)tc90522_get_cn_s(*cn) : (long long int)tc90522_get_cn_t(*cn));
 	return ret < 0 ? ret : 0;
 }
 
@@ -300,8 +300,10 @@ int tc90522_read_status(struct dvb_frontend *fe, fe_status_t *status)
 		break;
 	}
 
+	c->cnr.len = 1;
 	c->cnr.stat[0].svalue = demod->type == SYS_ISDBS ? tc90522_get_cn_s(raw) : tc90522_get_cn_t(raw);
 	c->cnr.stat[0].scale = FE_SCALE_DECIBEL;
+	pr_debug("v5 CN %lld (%lld dB)\n", raw, c->cnr.stat[0].svalue);
 	return ret < 0 ? ret : 0;
 }
 

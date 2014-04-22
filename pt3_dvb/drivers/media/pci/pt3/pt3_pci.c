@@ -72,7 +72,11 @@ int pt3_update_lnb(struct pt3_board *pt3)
 			adap = pt3->adap[i];
 			pr_debug("#%d sleep %d\n", adap->idx, adap->sleep);
 			if ((pt3_cfg[i].type == SYS_ISDBS) && (!adap->sleep))
-				lnb_eff |= lnb;
+				lnb_eff |= adap->voltage ? adap->voltage : lnb;
+		}
+		if (unlikely(lnb_eff < 0 || 2 < lnb_eff)) {
+			pr_err("Inconsistent LNB settings\n");
+			return -EINVAL;
 		}
 		if (pt3->lnb != lnb_eff) {
 			writel(pt3_lnb[lnb_eff].bits, pt3->bar_reg + PT3_REG_SYS_W);
@@ -209,6 +213,13 @@ int pt3_wakeup(struct dvb_frontend *fe)
 	adap->sleep = false;
 	pt3_update_lnb(adap->pt3);
 	return (adap->orig_init) ? adap->orig_init(fe) : 0;
+}
+
+int pt3_set_voltage(struct dvb_frontend *fe, fe_sec_voltage_t voltage)
+{
+	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
+	adap->voltage = voltage == SEC_VOLTAGE_18 ? 2 : voltage == SEC_VOLTAGE_13 ? 1 : 0;
+	return (adap->orig_voltage) ? adap->orig_voltage(fe, voltage) : 0;
 }
 
 void pt3_cleanup_adapter(struct pt3_adapter *adap)
@@ -352,8 +363,10 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		struct pt3_adapter *adap = pt3->adap[i];
 		pr_debug("#%d %s\n", i, __func__);
 
+		adap->orig_voltage     = fe[i]->ops.set_voltage;
 		adap->orig_sleep       = fe[i]->ops.sleep;
 		adap->orig_init        = fe[i]->ops.init;
+		fe[i]->ops.set_voltage = pt3_set_voltage;
 		fe[i]->ops.sleep       = pt3_sleep;
 		fe[i]->ops.init        = pt3_wakeup;
 		if ((adap->orig_init(fe[i]) && adap->orig_init(fe[i]) && adap->orig_init(fe[i])) ||
