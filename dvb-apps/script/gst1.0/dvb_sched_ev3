@@ -1,0 +1,172 @@
+#!/bin/bash
+now=$(date '+%s %Y-%m-%d')
+today=${now#?* }
+now=${now% ?*}
+
+# UNINST_CMD="~/bin/gst-1.0"
+UNINST_CMD=
+
+DVBEVREC=${DVBEVREC:-~/bin/dvb_apps/scripts/gst1.2/dvbevrec3.py}
+GETEID=${GETEID:-~/bin/dvb_apps/cmds/dumpeid}
+CONVSID=${CONVSID:-~/bin/dvb_apps/scripts/gst1.2/convsid3.py}
+
+#default param
+ADAPTER=0
+FRONTEND=0
+
+if [ $# -lt 3 ]; then
+    echo "Usage: $0
+	    <HH:MM> [<YYYY-mm-dd>] {-c <CHANNEL_NAME> | -s <SERVICE_ID>} 
+	    [-n] [-k all|none|<name>]...
+see also ${DVBEVREC##*/} -h" 1>&2
+    exit 1
+fi
+
+if [ ! -r "$DVBEVREC" ] || [ ! -x "$GETEID" ] || [ ! -x "$CONVSID" ]; then
+    echo "Edit ${0##.*/} and set DVBEVREC, GETEID, CONVSID properly." 1>&2
+    exit 1
+fi
+
+TIME="$1"
+shift
+if [ x"${1:0:1}" != x- ]; then
+    # date specified
+    TIME="$TIME $1"
+    shift
+    tm=$(date +%s --date "$TIME" 2> /dev/null)
+else
+    # only HH:MM specified or time & data are packed into one (quoted) arg
+    if [ x"$TIME##?* ?*}" != x ]; then # not packed
+        TIME="$TIME $today"
+        tm=$(date +%s --date "$TIME" 2> /dev/null)
+        if [ $(($tm + 7200)) -lt $now ]; then
+            TIME=$(date '+%H:%M %Y-%m-%d' --date "$TIME + 1 day" 2> /dev/null)
+        fi
+    fi
+    tm=$(date +%s --date "$TIME" 2> /dev/null)
+fi
+
+if [ x"$tm" == x ] || [ $(($tm + 60)) -le $now ]; then
+    echo "Invalid time specified." 1>&2
+    echo "Try dvbevrec2.py if you want to record an program on the air now." 1>&2
+    exit 1
+fi
+
+NOQUERY=
+CLEANUP=
+CHOPT=
+SIDOPT=
+OUTOPT=
+EID=
+INFO=
+
+# prepare for the later EID retrieval
+# (channel-name & output-file-name are saved to be quoted in the at script)
+# (if either channel-name or service-id is missing, 
+#     it's tried to be retreived from conf-file using the other as a key)
+declare -a args
+while [ "$1" != "" ]; do
+    case "$1" in
+    (-n|--no-eid-query) NOQUERY=1 ;;
+    (-k|--kill-others) shift; CLEANUP=$1 ;;
+    (--kill-others=?*) CLEANUP=${1#--kill-others=} ;;
+    (-s|--serviceid) shift; SID=$1 ;;
+    (--serviceid=?*) SID=${1#--serviceid=} ;;
+    (-c|--channel)   shift; CH=$1 ;;
+    (--channel=?*)   CH=${1#--channel=} ;;
+    (-e|--eventid)   shift; EID=$1 ;;
+    (--eventid=?*)   EID=${1#--eventid=} ;;
+    (-a|--adapter)   args[${#args[@]}]="$1"; shift; ADAPTER=$1; args[${#args[@]}]="$1" ;;
+    (--adapter=?*)   args[${#args[@]}]="$1"; ADAPTER=${1#--channel=} ;;
+    (-f|--frontend)  args[${#args[@]}]="$1"; shift; FRONTEND=$1; args[${#args[@]}]="$1" ;;
+    (--frontend=?*)  args[${#args[@]}]="$1"; FRONTEND=${1#--frontend=} ;;
+    (-o|--output)     shift; OUTOPT="--output=$1" ;;
+    (--output=?*)    OUTOPT="$1" ;;
+    (-i|--info)      INFO="-i -i" ;;
+    (*)              args[${#args[@]}]="$1" ;;
+    esac
+    shift
+done
+
+# derive some parameters
+FE_FILE="/dev/dvb/adapter${ADAPTER}/frontend${FRONTEND}"
+# FIXME: use demuxN instead?
+
+case "$CLEANUP" in
+(all|on|yes|true|1) CLEANUP='.+' ;;
+(none|no|off|false|0) CLEANUP= ;;
+("") CLEANUP='.+' ;;
+esac
+
+[ x"$EID" != x ] && NOQUERY=1
+
+[ x"$SID" != x ] && [ x"$CH" == x ] && CH=$("$CONVSID" -s $SID)
+[ x"$SID" == x ] && [ x"$CH" != x ] && SID=$("$CONVSID" -c "$CH")
+
+[ x"$CH" != x ] && CHOPT="--channel=$CH"
+[ x"$SID" != x ] && SIDOPT="--serviceid=$SID"
+
+if [ x"$SID" == x ] && [ x"$CH" == x ] ; then
+    echo "Usage: $0
+	    <HH:MM> [<YYYY-mm-dd>] {-c <CHANNEL_NAME> | -s <SERVICE_ID>} 
+	    [-n] [-k all|none|<name>]...
+see also ${DVBEVREC##*/} -h" 1>&2
+    exit 1
+fi
+
+# query EID in advance
+if [ x"$NOQUERY" == x ] && [ x"$CH" != x ] && [ x"$SID" != x ] && \
+   [ $tm -gt $(($now + 120)) -o $tm -lt $now ] ; then
+    fuser -s "$FE_FILE" 2>/dev/null || \
+    EID=$($UNINST_CMD gst-launch-1.0 uridecodebin uri="dvb://${ADAPTER}@$CH?frontend=$FRONTEND" caps=video/mpegts \! fdsink 2>/dev/null | "$GETEID" -o -w 59 -p $SID -t "$TIME" $INFO 2> /dev/null && QUERIED=ok)
+    if [ -n "$INFO" ]; then
+        echo $EID | sed -e 's/^serviceID: .\+ duration: [0-9:]\+//' -e 's/ desc: .\+$//'
+        EID=$(echo $EID | cut -s -d ' ' -f 4)
+        [ -n $EID ] && QUERIED=ok
+    fi
+    echo " using EID:${EID:-none}..." 1>&2
+fi
+
+if [ $tm -lt $now ] && [ x"$QUERIED" == xok ] && [ x"$EID" == x ]; then
+    echo "The program already finished in the past." 1>&2
+    exit 0
+fi
+
+[ x"$EID" != x ] && EOPT="--eventid=$EID"
+
+
+if [ $(($tm - 60)) -le $(date +%s) ]; then
+    echo "The time is too near or already past. starting immediately..." 1>&2
+    if [ x"$CLEANUP" != x ]; then
+        for p in $(fuser "$FE_FILE" 2>/dev/null); do
+            ps -p $p -o cmd= | egrep -e "$CLEANUP" >&/dev/null && kill $p >&/dev/null
+        done
+    fi
+    $UNINST_CMD python "$DVBEVREC" "$CHOPT" "$SIDOPT" "$OUTOPT" "$EOPT" "${args[@]}" -w 1 &
+    exit 0
+fi
+
+at $TIME - 1 minutes <<EOT
+export LD_LIBRARY_PATH="$DYLD_LIBRARY_PATH"
+EOPT=
+EID="$EID"
+[ x"$NOQUERY" == x ] && [ x"$CH" != x ] && [ x"$SID" != x ] && [ x"\$EID" == x ] && \
+    EID=\$($UNINST_CMD gst-launch-1.0 uridecodebin uri="dvb://${ADAPTER}@$CH\?frontend=$FRONTEND" \
+        caps=video/mpegts \\! fdsink 2>/dev/null | "$GETEID" -w 20 -p $SID -t "$TIME" 2>/dev/null)
+[ x"\$EID" != x ] && EOPT="--eventid=\$EID"
+
+tm=\$(date +%s --date "$TIME" 2> /dev/null)
+if [ \$tm -lt \$(date +%s) ]; then
+    echo -n "\${tm}(\$EID): "
+    echo 'already past the time [${TIME}] to start recording.' 1>&2
+    [ x"\$EID" != x ] || exit 1
+fi
+
+fuser -s "$FE_FILE" 2>/dev/null && sleep 45
+if [ x'$CLEANUP' != x ]; then
+    for p in \$(fuser "$FE_FILE" 2>/dev/null); do
+        ps -p \$p -o cmd= | egrep -e '$CLEANUP' >& /dev/null && kill \$p >& /dev/null
+    done
+fi
+ionice -c 2 -n 0 $UNINST_CMD python "$DVBEVREC" -v "$CHOPT" "$SIDOPT" "$OUTOPT" \$EOPT ${args[@]}
+EOT

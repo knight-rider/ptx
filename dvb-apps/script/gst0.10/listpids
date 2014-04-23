@@ -1,0 +1,2 @@
+#!/bin/bash
+~/bin/dvb_apps/cmds/dumpts | head -n 204800 | cut -s -d ' ' -f 1 | sort -u

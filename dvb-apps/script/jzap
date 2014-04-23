@@ -1,0 +1,17 @@
+#!/bin/bash
+while getopts :c:a:d:f:h opt; do
+  case $opt in
+    'c') conffile=$OPTARG;;
+    'a') adapter=$OPTARG;;
+    'f') frontend=$OPTARG;;
+    'h') echo "Usage: $0 [-a <adapter#>] [-f <frontend#>] <channel_name>" 1>&2;
+         exit;;
+  esac
+done
+[ $OPTIND -gt $# ] && exit 1
+
+declare -a chinfo=($(awk -F ':' -e '$1=="'"${!OPTIND}"'"{print $2, $3; exit}' ${conffile:-$HOME/.mplayer/channels.conf}))
+
+[ ${#chinfo[*]} -eq 2 ] || exit 1
+echo gst-launch dvbbasebin s2api-tune-props="${chinfo[0]}" program-numbers="${chinfo[1]}" ${adapter:+adapter=$adapter} ${frontend:+frontend=$frontend} ! fakesink 1>&2
+gst-launch dvbbasebin s2api-tune-props="${chinfo[0]}" program-numbers="${chinfo[1]}" ${adapter:+adapter=$adapter} ${frontend:+frontend=$frontend} ! fakesink

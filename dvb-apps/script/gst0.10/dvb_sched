@@ -1,0 +1,144 @@
+#!/bin/sh
+now=$(date '+%s %Y-%m-%d')
+today=${now#?* }
+now=${now% ?*}
+
+UNINST_CMD=
+DVBREC=~/bin/dvb_apps/scripts/gst0.10/dvbrec.py
+
+#default param
+ADAPTER=0
+FRONTEND=0
+
+if [ $# -lt 3 ]; then
+    echo "Usage: $0
+	    <HH:MM> [<YYYY-mm-dd>] {-c <CHANNEL_NAME> | -s <SERVICE_ID>}
+	    [-k all|none|<name>]...
+see also ${DVBEVREC##*/} -h" 1>&2
+    exit 1
+fi
+
+if [ ! -r $DVBREC ]; then
+    echo "Edit this script to set the proper DVBREC."
+    exit 1
+fi
+
+TIME="$1"
+STARTOPT=
+shift
+if [ x"${1:0:1}" != x- ]; then
+    # date specified
+    TIME="$TIME $1"
+    shift
+    tm=$(date +%s --date "$TIME" 2> /dev/null)
+    STARTOPT=$(date '+%Y-%m-%dT%H:%M:00' --date "$TIME" 2> /dev/null)
+else
+    # only HH:MM specified or time & data are packed into one (quoted) arg
+    if [ x"$TIME##?* ?*}" != x ]; then # not packed
+        TIME="$TIME $today"
+    fi
+    tm=$(date +%s --date "$TIME" 2> /dev/null)
+    if [ x"${TIME##?* ?*}" != x ] && [ $(($tm + 60)) -lt $now ]; then
+        TIME=$(date '+%H:%M %Y-%m-%d' --date "$TIME + 1 day" 2> /dev/null)
+        tm=$(date +%s --date "$TIME" 2> /dev/null)
+    fi
+    STARTOPT=$(date '+%Y-%m-%dT%H:%M:00' --date "$TIME" 2> /dev/null)
+fi
+
+if [ x"$tm" == x ]; then
+    echo "Invalid time specified." 1>&2
+    exit 1
+fi
+
+
+CLEANUP=
+CHOPT=
+OUTOPT=
+LENGTH=
+LENOPT=
+T_ERROR_MSG="you cannot specify -t/--start option with $0. ignoring..."
+# (channel-name & output-file-name are saved to be quoted in the at script)
+# (-t option is caliculated from $1[& $2] and must no be specified by users)
+# (-l option is recaliculated with [now - start_time])
+declare -a args
+while [ "$1" != "" ]; do
+    case "$1" in
+    (-k|--kill-others) shift; CLEANUP=$1 ;;
+    (--kill-others=?*) CLEANUP=${1#--kill-others=} ;;
+    (-c|--channel)   shift; CH=$1 ;;
+    (--channel=?*)   CH=${1#--channel=} ;;
+    (-o|--output)     shift; OUTOPT="--output=$1" ;;
+    (--output=?*)    OUTOPT="$1" ;;
+    (-a|--adapter)   args[${#args[@]}]="$1"; shift; ADAPTER=$1; args[${#args[@]}]="$1" ;;
+    (--adapter=?*)   args[${#args[@]}]="$1"; ADAPTER=${1#--channel=} ;;
+    (-f|--frontend)  args[${#args[@]}]="$1"; shift; FRONTEND=$1; args[${#args[@]}]="$1" ;;
+    (--frontend=?*)  args[${#args[@]}]="$1"; FRONTEND=${1#--frontend=} ;;
+    (-l|--length)    shift; LENGTH=$1 ;;
+    (--length=?*)    LENGTH=${1#--length=} ;;
+    (-t|--start)      shift; echo "$T_ERROR_MSG" 1>&2 ;;
+    (--start=?*)      echo "$T_ERROR_MSG" 1>&2 ;;
+    (*)              args[${#args[@]}]="$1" ;;
+    esac
+    shift
+done
+
+# derive some parameters
+FE_FILE="/dev/dvb/adapter${ADAPTER}/frontend${FRONTEND}"
+# FIXME: use demuxN instead?
+
+case "$CLEANUP" in
+(all|on|yes|true|1) CLEANUP='.+' ;;
+(none|no|off|false|0) CLEANUP= ;;
+("") CLEANUP='.+' ;;
+esac
+
+[ x"$CH" != x ] && CHOPT="--channel=$CH"
+
+if [ -n "$LENGTH" ] && [ $LENGTH -le 0 ]; then
+    echo "Invalid value [$LENGTH] in -l option." 1>&2
+    exit 1
+fi
+
+[ $tm -lt $now ] && [ -n "$LENGTH" ] && LENGTH=$(($LENGTH - ( $now - $tm ) / 60))
+[ x"$LENGTH" != x ] && LENOPT="--length=$LENGTH"
+if [ $(($tm + 60 * ${LENGTH:-60})) -lt $now ]; then
+    echo "The start time is already past too far." 1>&2
+    exit 0
+fi
+
+if [ $(($tm - 60)) -lt $(date +%s) ]; then
+    echo "The time is too near or already past. starting immediately..." 1>&2
+    if [ x"$CLEANUP" != x ]; then
+        for p in $(fuser "$FE_FILE" 2>/dev/null); do
+            ps -p $p -o cmd= | egrep -e "$CLEANUP" >&/dev/null && kill $p >&/dev/null
+        done
+    fi
+    $UNINST_CMD python "$DVBREC" "$CHOPT" "$OUTOPT" "$LENOPT" "${args[@]}" &
+    exit 0
+fi
+
+at $TIME - 1 minutes <<-EOT
+tm=\$(date +%s --date "$TIME" 2> /dev/null)
+now=\$(date +%s)
+
+LOPT=
+LEN="$LENGTH"
+if [ \$tm -lt \$now ] && [ x"\$LEN" != x ]; then
+    \$LEN=\$((\$LEN - ( \$now - \$tm ) / 60))
+fi
+[ x"\$LEN" != x ] && LOPT="--length=\$LEN"
+
+if [ \$((\$tm + 60 * \${LEN:-60})) -lt \$now ]; then
+    echo 'already past the time [${TIME}] to start recording.'
+    exit 1
+fi
+
+fuser -s "$FE_FILE" 2>/dev/null && sleep 45
+if [ x'$CLEANUP' != x ]; then
+    for p in \$(fuser "$FE_FILE" 2>/dev/null); do
+        ps -p \$p -o cmd= | egrep -e '$CLEANUP' >& /dev/null && kill \$p >& /dev/null
+    done
+fi
+$UNINST_CMD python "$DVBREC" "$CHOPT" "$OUTOPT" -t $STARTOPT \$LOPT ${args[@]}
+EOT
+

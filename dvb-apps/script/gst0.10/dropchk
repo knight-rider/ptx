@@ -1,0 +1,12 @@
+#!/usr/bin/awk -f
+#
+# parse the output from dumpts, check CC field and its discontinuity.
+# example: dumpts < "ts-file" | grep '^0100' | dropchk | grep '-------' | wc
+#
+{
+	pos=strtonum("0x"$2);
+	if (pos != (prev + 1)%16)
+		print "-----------------";
+	prev = pos;
+	print $0;
+}
