@@ -72,7 +72,7 @@ static int dump_si(struct isdbt_si *si)
 	struct pmt *pmt;
 
 	if (si->pat.ver == -1) {
-		fprintf(stderr, " PAT not recived.\n");
+		fprintf(stderr, " PAT not received.\n");
 		return -1;
 	}
 
@@ -88,7 +88,7 @@ static int dump_si(struct isdbt_si *si)
 			si->pat.prog[i].prog_id, si->pat.prog[i].pmt_pid);
 
 		if (!pmt || pmt->ver == -1) {
-			fprintf(stderr, " not recieved.\n");
+			fprintf(stderr, " not received.\n");
 			continue;
 		}
 

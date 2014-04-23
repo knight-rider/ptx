@@ -222,18 +222,19 @@ int search(int adapter_nr, int cs, int channel_id)
 	props.props = &prop[3];
 	props.num = 1;
 	while (1){
-		int ret;
 		usleep(100 * 1000);
-		if (((ret = ioctl(fd, FE_READ_STATUS, &status)) < 0) || ((ret = ioctl(fd, FE_GET_PROPERTY, &props)) < 0)) {
+		if ((ioctl(fd, FE_READ_STATUS, &status) < 0) || (ioctl(fd, FE_GET_PROPERTY, &props) < 0)) {
 			perror("ioctl FE_READ_STATUS / FE_GET_PROPERTY");
-			printf("%d\n", ret);
+			break;
 		} else if ((status & FE_HAS_LOCK) && (prop[3].u.st.len))
-			printf("DVBv5 CN %f (dB) ", ((double)prop[3].u.st.stat[0].svalue)/10000.);
+			printf("\rDVBv5 CN %f (dB) ", ((double)prop[3].u.st.stat[0].svalue)/10000.);
 
-		if ((ret = ioctl(fd, FE_READ_SIGNAL_STRENGTH, &raw)) < 0) {
+		if (ioctl(fd, FE_READ_SIGNAL_STRENGTH, &raw) < 0) {
 			perror("ioctl FE_READ_SIGNAL_STRENGTH");
-			printf("%d\n", ret);
+			break;
 		} else {
+			if (!raw)
+				continue;
 			if (prev == 0xffff)
 				prev = raw;
 			if (info.type == FE_OFDM) {
@@ -250,7 +251,7 @@ int search(int adapter_nr, int cs, int channel_id)
 			}
 			if (cnr > cnrmax) cnrmax = cnr;
 			if (cnr < cnrmin) cnrmin = cnr;
-			printf("DVBv3 raw %d cnr %f min %f max %f\r", raw, cnr, cnrmin, cnrmax);
+			printf("DVBv3 raw %d cnr %f min %f max %f", raw, cnr, cnrmin, cnrmax);
 			prev = cnr;
 		}
 	}

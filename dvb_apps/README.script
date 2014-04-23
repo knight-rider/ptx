@@ -1,11 +1,11 @@
 構成
 
-scripts/gst0.10/*
+script/gst0.10/*
  録画用スクリプト とヘルパースクリプト等
  録画にはgstreamer 0.10 のISDB用パッチ当て版を用いる。
 
-scripts/gst1.2/*
- 上記と同じスクリプトをgstreamer 1.2系に対応させたもの。
+script/gst1.0/*
+ 上記と同じスクリプトをgstreamer 1.0系に対応させたもの。
  各スクリプトの使い方は、（末尾の3を除いた）同名の0.10系用バージョンと同じ。
 
 ---------------
@@ -126,13 +126,13 @@ dvbevrec2.py/dvbevrec3.py
 
 --------------
 
-scripts/tsdump
+script/tsdump
   TSパケットのHEXダンプを表示する.デバッグ用
   ex. tsdump < foo.ts | lv
 
 -------------
 
-scripts/dropchk
+script/dropchk
   ../cmds/build/dumptsの出力をチェックし,パケット落ちを表示する
   ex. dumpts < foo.ts | grep '^0100' | dropchk | grep '-------' | wc
   パケットのCCカウンタの飛びがあれば ---------- を出力する.

@@ -7,7 +7,7 @@
 ----------
 各コマンドの概要
 
-cmds/s2scan
+cmd/s2scan
  mplayer/gstreamer用のチャンネルリスト設定を生成. {t,z,a}scan のS2API版
 
  使い方:
@@ -42,7 +42,7 @@ ex2. BSの全物理チャンネルとTSIDをスキャン
   NHK教育などで2～3番組編成などしている場合以外は 通常同じ内容となっている.(サービスIDが違うだけ)
 
 -----------
-cmds/restamp
+cmd/restamp
  MurdocCutter等でsequence単位でカットし連結されたTSファイルの
  PTS,DTSを付け直すツール.
  つなぎ目を再生する時につかえたり つなぎ目をまたいだシークがうまくいかない
@@ -51,13 +51,13 @@ cmds/restamp
 
 -----------
 
-cmds/nidump
+cmd/nidump
  PAT, PMTなどの情報を表示し,TSのpid構成を見る.
  ex. nitdump < ~/foo.ts
 
 -----------
 
-cmds/dumpts[2]
+cmd/dumpts[2]
   TSパケットのヘッダ表示する.
   ex. dumpts < foo.ts | lv
  フォーマットは出力の先頭から
@@ -65,15 +65,15 @@ cmds/dumpts[2]
  dumpts2は行頭にパケットの開始アドレスも表示する。
 
 -----------
-cmds/dumpeid
+cmd/dumpeid
   入力されるTSにおいて, 指定した時刻で放送されているイベントのEIDを表示する
   使い方については、dumpeid -h およびdumpeid.cの先頭部分を参照
 
 -----------
-cmds/fixpat
+cmd/fixpat
   PAT中のプログラムを指定した１つのみに変更する
   fixpat -h参照
 
 -----------
-cmds/ptsdump
+cmd/ptsdump
   入力ストリームから、各PESのPTS/DTSとPCRの値と出現位置をリストアップする。
