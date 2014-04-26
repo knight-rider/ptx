@@ -20,5 +20,9 @@ Feature changes:
 The full package (buildable as standalone, DKMS or tree embedded module) is available at
 https://github.com/knight-rider/ptx/tree/master/pt3_dvb
 
+インすトール方法：
+$ chmod +x dkms.install dkms.uninstall
+$ ./dkms.install
+
 複数枚同時装着での動作は未検証です。どなたか、ボード等環境を提供して頂ければ幸いですが。
 
