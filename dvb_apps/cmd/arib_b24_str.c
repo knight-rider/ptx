@@ -20,13 +20,11 @@ struct g_char_s {
 };
 typedef struct g_char_s gstr;
 
-struct code_state
-{
+struct code_state {
   int gl;	/* index of the group invoked to GL */
   int gr;	/* index of the group invoked to GR */
   int ss;	/* flag if in SS2 or SS3.  2:SS2, 3:SS3 */
-  struct
-  {
+  struct {
     uint8_t mb, code;
   } g[4];
 };
@@ -59,7 +57,7 @@ static const char *trans_ext90[] = {
 };
 
 static const char *trans_ext92[][94] = {
-  {			     /* row 92 */
+	{			     /* row 92 */
 	"\xA2\xAA", "\xA2\xAB", "\xA2\xAC", "\xA2\xAD", "\xA6\xBB",
 	"\xA6\xBC", "\xC7\xAF", "\xB7\xEE", "\xC6\xFC", "\xB1\xDF",
 	"\xAD\xD6", "m^3", "\xAD\xD1", "\xAD\xD1^2", "\xAD\xD1^3",
@@ -78,8 +76,9 @@ static const char *trans_ext92[][94] = {
 	"(ke", "y)", "(sa", "x)", "(sy",
 	"n)", "(or", "g)", "(pe", "r)",
 	"(R)", "(C)", "(\xE4\xB7)", "DJ", "[\xB1\xE9]",
-	"Fax", ".", ".", "."},
-  {			     /* row 93 */
+	"Fax", ".", ".", "."
+	},
+	{			     /* row 93 */
 	"(\xB7\xEE)", "(\xB2\xD0)", "(\xBF\xE5)", "(\xCC\xDA)", "(\xB6\xE2)",
 	"(\xC5\xDA)", "(\xC6\xFC)", "(\xBD\xCB)", "\xAD\xED", "\xAD\xEE",
 	"\xAD\xEF", "\xAD\xDF", "\xAD\xE2", "\xAD\xE4", "\xA2\xA9",
@@ -98,8 +97,9 @@ static const char *trans_ext92[][94] = {
 	".", "\xA3\xBA", "\xA8\xEB", "\xA8\xEE", ".",
 	/* 81-90 */
 	".", ".", ".", ".", ".", ".", ".", ".", ".", "\xA2\xFC",
-	"\xA6\xE7", ".", ".", "."},
-  {			     /* row 94 */
+	"\xA6\xE7", ".", ".", "."
+	},
+	{			     /* row 94 */
 	"\xAD\xB5", "\xAD\xB6", "\xAD\xB7", "\xAD\xB8", "\xAD\xB9",
 	"\xAD\xBA", "\xAD\xBB", "\xAD\xBC", "\xAD\xBD", "\xAD\xBE",
 	"\xAD\xBF", "\xAD\xD7", "\xAD\xB1", "\xAD\xB2", "\xAD\xB3",
@@ -118,7 +118,8 @@ static const char *trans_ext92[][94] = {
 	"\xAD\xAC", "\xAD\xAD", "\xAD\xAE", "\xAD\xAF", "\xAD\xB0",
 	"\xAC\xA1", "\xAC\xA2", "\xAC\xA3", "\xAC\xA4", "\xAC\xA5",
 	"\xAC\xA6", "\xAC\xA7", "\xAC\xA8", "\xAC\xA9", "\xAC\xAA",
-	"\xAC\xAB", "\xAC\xAC", "\xA8\xCB", "."}
+	"\xAC\xAB", "\xAC\xAC", "\xA8\xCB", "."
+	}
 };
 
 static const char *trans_ext85[] = {
@@ -238,13 +239,13 @@ void append_arib_char (gstr *euc_str, const struct code_state *state,
 	c2 &= 0x7F;
 	switch (c1) {
 	case 0x7A:
-	  if (c2 < 0x4D) {
-	    g_string_append_c (euc_str, UNDEF_CHAR);
-	  } else {
-	    c2 -= 0x4D;
-	    g_string_append (euc_str, trans_ext90[c2]);
-	  }
-	  break;
+		if (c2 < 0x4D)
+			g_string_append_c (euc_str, UNDEF_CHAR);
+		else {
+			c2 -= 0x4D;
+			g_string_append (euc_str, trans_ext90[c2]);
+		}
+		break;
 	case 0x7C:
 	case 0x7D:
 	case 0x7E:
@@ -281,8 +282,7 @@ void aribstr_to_utf8 (char *source, size_t len, char *dest, size_t buf_len)
   iconv_t cd;
   char *p;
 
-  enum
-  {
+  enum {
     NORMAL,
     ESCAPE,
     DESIGNATE_1B,
