@@ -103,22 +103,23 @@ static int search(int adapter_nr, int channel_id)
 	prop[1].cmd = DTV_STREAM_ID;
 	prop[1].u.data = channel->ts_id;
 	prop[2].cmd = DTV_TUNE;
-
 	props.props = prop;
 	props.num = 3;
-
 	if ((ioctl(fd, FE_SET_PROPERTY, &props)) < 0) {
 		perror("ioctl FE_SET_PROPERTY");
 		goto out;
 	}
+
+	prop[0].cmd = DTV_STAT_CNR;
+	props.num = 1;
 	for (i = 0; i < 4; i++) {
-		if (ioctl(fd, FE_READ_STATUS, &status) < 0) {
-			perror("ioctl FE_READ_STATUS");
+		if ((ioctl(fd, FE_READ_STATUS, &status) < 0) || (ioctl(fd, FE_GET_PROPERTY, &props) < 0)) {
+			perror("ioctl FE_READ_STATUS / FE_GET_PROPERTY");
 			goto out;
 		}
-		if (status & FE_HAS_LOCK) {
-			fprintf(stderr, "Successfully tuned to %s .\n",
-				channel->name);
+		if ((status & FE_HAS_LOCK) && prop[0].u.st.stat[0].svalue) {
+			fprintf(stderr, "Successfully tuned to %s, %f dB\n",
+				channel->name, ((double)prop[0].u.st.stat[0].svalue)/10000.);
 			return 0;
 		}
 		usleep(250 * 1000);

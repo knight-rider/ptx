@@ -229,8 +229,8 @@ int search(int adapter_nr, int cs, int channel_id)
 		} else if ((status & FE_HAS_LOCK) && (prop[3].u.st.len))
 			printf("\rDVBv5 CN %f (dB) ", ((double)prop[3].u.st.stat[0].svalue)/10000.);
 
-		if (ioctl(fd, FE_READ_SIGNAL_STRENGTH, &raw) < 0) {
-			perror("ioctl FE_READ_SIGNAL_STRENGTH");
+		if (ioctl(fd, FE_READ_SNR, &raw) < 0) {
+			perror("ioctl FE_READ_SNR");
 			break;
 		} else {
 			if (!raw)

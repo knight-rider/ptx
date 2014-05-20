@@ -9,13 +9,21 @@ It behaves similarly as PT1 DVB, plus some tuning enhancements:
 Feature changes:
 - dropped DKMS & standalone compile
 - dropped verbosity (debug levels), use single level -DDEBUG instead
-- changed SNR (.read_snr) to CNR (.read_signal_strength)
 - moved demodulator FE to drivers/media/dvb-frontends
 - moved tuners to drivers/media/tuners
 - translated to standard (?) I2C protocol
 - dropped FE's LNB control & other unused features
+- DVBv3: changed back .read_signal_strength to .read_snr for CNR (digitally modulated SNR)
 - added DVBv5 CNR support
 - improved CNR precision
+
+Main components:
+1. Sharp	VA4M6JC2103	: contains 2 ISDB-S + 2 ISDB-T (customized?) tuners
+	ISDB-S : Sharp QM1D1C0042 RF-IC
+	ISDB-T : MaxLinear CMOS Hybrid TV MxL301RF
+2. Toshiba	TC90522XBG	: (customized?) 2ch OFDM + 2ch 8PSK demodulator
+3. Altera	EP4CGX15BF14C8N	: customized FPGA PCI bridge
+4. ESMT		M12L16161A-7TG	: on-board memory
 
 The full package (buildable as standalone, DKMS or tree embedded module) is available at
 https://github.com/knight-rider/ptx/tree/master/pt3_dvb
