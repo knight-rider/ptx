@@ -13,7 +13,7 @@ Feature changes:
 - moved tuners to drivers/media/tuners
 - translated to standard (?) I2C protocol
 - dropped FE's LNB control & other unused features
-- DVBv3: changed back .read_signal_strength to .read_snr for CNR (digitally modulated SNR)
+- DVBv3: changed back .read_signal_strength to .read_snr for raw CNR (digitally modulated SNR)
 - added DVBv5 CNR support
 - improved CNR precision
 
@@ -33,4 +33,5 @@ $ chmod +x dkms.install dkms.uninstall
 $ ./dkms.install
 
 複数枚同時装着での動作は未検証です。どなたか、ボード等環境を提供して頂ければ幸いですが。
+ISDB-T チューニングできないという報告がありますが、こちらでは全く問題ないので make debug でログを調べてみて下さい。
 

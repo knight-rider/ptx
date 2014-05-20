@@ -160,7 +160,7 @@ enum tc90522_pwr {
 int tc90522_set_powers(struct tc90522 *demod, enum tc90522_pwr pwr)
 {
 	u8 data = pwr | 0b10011001;
-	pr_debug("#%d tuner %s amp %s\n", demod->idx, pwr & TC90522_PWR_TUNER_ON ?
+	pr_debug("#%d %s tuner %s amp %s\n", demod->idx, __func__, pwr & TC90522_PWR_TUNER_ON ?
 		"ON" : "OFF", pwr & TC90522_PWR_AMP_ON ? "ON" : "OFF");
 	return tc90522_write_data(&demod->fe, 0x1e, &data, 1);
 }
@@ -289,7 +289,7 @@ int tc90522_tune_s(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 
 	switch (demod->state) {
 	case TC90522_IDLE:
-		*delay = msecs_to_jiffies(3000);
+		*delay = msecs_to_jiffies(2000);
 		*status = 0;
 		return 0;
 
@@ -360,12 +360,12 @@ int tc90522_tune_s(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 		/* fallthrough */
 
 	case TC90522_TRACK:
-		*delay = msecs_to_jiffies(3000);
+		*delay = msecs_to_jiffies(2000);
 		*status = FE_HAS_SIGNAL | FE_HAS_CARRIER | FE_HAS_LOCK;
 		return 0;
 
 	case TC90522_ABORT:
-		*delay = msecs_to_jiffies(3000);
+		*delay = msecs_to_jiffies(2000);
 		*status = FE_HAS_SIGNAL;
 		return 0;
 	}
@@ -423,7 +423,7 @@ int tc90522_tune_t(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 
 	switch (demod->state) {
 	case TC90522_IDLE:
-		*delay = msecs_to_jiffies(3000);
+		*delay = msecs_to_jiffies(2000);
 		*status = 0;
 		return 0;
 
@@ -455,12 +455,12 @@ int tc90522_tune_t(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 		/* fallthrough */
 
 	case TC90522_TRACK:
-		*delay = msecs_to_jiffies(3000);
+		*delay = msecs_to_jiffies(2000);
 		*status = FE_HAS_SIGNAL | FE_HAS_CARRIER | FE_HAS_LOCK;
 		return 0;
 
 	case TC90522_ABORT:
-		*delay = msecs_to_jiffies(3000);
+		*delay = msecs_to_jiffies(2000);
 		*status = FE_HAS_SIGNAL;
 		return 0;
 	}
