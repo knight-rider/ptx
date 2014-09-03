@@ -485,18 +485,18 @@ static struct dvb_frontend_ops tc90522_ops_t = {
 };
 
 /**** Common ****/
-struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, u8 idx, fe_delivery_system_t type, u8 addr_demod, bool pwr_on)
+struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_t type, u8 addr_demod, bool pwr_on)
 {
 	struct dvb_frontend *fe;
 	struct tc90522 *demod = kzalloc(sizeof(struct tc90522), GFP_KERNEL);
 	if (!demod)
 		return NULL;
 
-	demod->i2c	= i2c;
-	demod->idx	= idx;
-	demod->type	= type;
 	demod->addr_demod = addr_demod;
-	fe = &demod->fe;
+	demod->idx	= (!(addr_demod & 1) << 1) + ((addr_demod & 2) >> 1);
+	demod->i2c	= i2c;
+	demod->type	= type;
+	fe		= &demod->fe;
 	memcpy(&fe->ops, (demod->type == SYS_ISDBS) ? &tc90522_ops_s : &tc90522_ops_t, sizeof(struct dvb_frontend_ops));
 	fe->demodulator_priv = demod;
 

@@ -161,7 +161,7 @@ void mxl301rf_rftune(u8 *data, u32 *size, u32 freq)
 	pr_debug("mx_rftune freq=%d\n", freq);
 }
 
-/* write via demod */
+/* write via demodulator */
 int mxl301rf_fe_write_data(struct dvb_frontend *fe, u8 addr_data, const u8 *data, int len)
 {
 	u8 buf[len + 1];
@@ -183,7 +183,7 @@ int mxl301rf_fe_write_tuner(struct dvb_frontend *fe, const u8 *data, int len)
 	return fe->ops.write(fe, buf, len + 2);
 }
 
-/* read via demod */
+/* read via demodulator */
 void mxl301rf_fe_read(struct dvb_frontend *fe, u8 addr, u8 *data)
 {
 	const u8 wbuf[2] = {0xfb, addr};

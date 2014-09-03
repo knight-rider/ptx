@@ -42,7 +42,7 @@ bool pt3_i2c_is_clean(struct pt3_board *pt3)
 
 void pt3_i2c_reset(struct pt3_board *pt3)
 {
-	writel(1 << 17, pt3->bar_reg + PT3_REG_I2C_W);	/* 0x00020000 */
+	writel(1 << 17, pt3->bar_reg + PT3_REG_I2C_W);			/* 0x00020000 */
 }
 
 void pt3_i2c_wait(struct pt3_board *pt3, u32 *status)
@@ -51,12 +51,12 @@ void pt3_i2c_wait(struct pt3_board *pt3, u32 *status)
 
 	while (1) {
 		val = readl(pt3->bar_reg + PT3_REG_I2C_R);
-		if (!(val & 1))				/* sequence stopped */
+		if (!(val & 1))						/* sequence stopped */
 			break;
 		msleep_interruptible(1);
 	}
 	if (status)
-		*status = val;				/* I2C register status */
+		*status = val;						/* I2C register status */
 }
 
 void pt3_i2c_mem_write(struct pt3_board *pt3, u8 data)
@@ -145,7 +145,7 @@ int pt3_i2c_xfer(struct i2c_adapter *i2c, struct i2c_msg *msg, int num)
 
 	if (!num)
 		return pt3_i2c_flush(pt3, false, PT3_I2C_START_ADDR);
-	if ((num < 1) || (num > 3) || !msg || msg[0].flags)	/* always write first */
+	if ((num < 1) || (num > 3) || !msg || msg[0].flags)		/* always write first */
 		return -ENOTSUPP;
 	mutex_lock(&pt3->lock);
 	pt3->i2c_addr = 0;

@@ -31,27 +31,29 @@ static struct channel isdbt_channels[] = {
 };
 
 static struct channel isdbs_channels[] = {
-	{   1, "NHK BS-1",          1318000, 0x40f1 },
-	{   2, "NHK BS-2",          1318000, 0x40f1 },
-	{   3, "NHK BS-Hi",         1318000, 0x40f2 },
-	{   4, "BS日テレ",          1279640, 0x40d0 },
-	{   5, "BS朝日",            1049480, 0x4010 },
-	{   6, "BS-i",              1049480, 0x4011 },
-	{   7, "BSジャパン",        1087840, 0x4031 },
-	{   8, "BSフジ",            1279640, 0x40d1 },
-	{   9, "WOWOW",             1087840, 0x4030 },
-	{  10, "STAR CHANNEL HV",   1202920, 0x4091 },
-	{  11, "BS11",              1202920, 0x4090 },
-	{  12, "TwellV",            1202920, 0x4092 },
+	{   1, "NHK BS-1",	1318000, 0x40f1 },
+	{   3, "NHK BS-Hi",	1318000, 0x40f2 },
+	{   4, "BS日テレ",	1279640, 0x40d0 },
+	{   5, "BS朝日",	1049480, 0x4010 },
+	{   6, "BS-i",		1049480, 0x4011 },
+	{   7, "BSジャパン",	1087840, 0x4031 },
+	{   8, "BSフジ",	1279640, 0x40d1 },
+	{   9, "WOWOW",		1087840, 0x4030 },
+	{  10, "★ch HV",	1202920, 0x4091 },
+	{  11, "BS11",		1202920, 0x4090 },
+	{  12, "TwellV",	1202920, 0x4092 },
 
-	{  13, "CS 0x7100",	1893000, 0x7100 },
-	{  14, "CS 0x7060",	1693000, 0x7060 },
+	{ 104, "CS7040",	1653000, 0x7040 },
+	{ 106, "CS7060 294:ホームドラマチャンネル 323:MTV-HD 329:歌謡ポップスチャンネル 340:ディスカバリーチャンネル 341:アニマルプラネット 354:CNNj", 1693000, 0x7060},
+	{ 112, "CS70c0",	1813000, 0x70c0 },
+	{ 116, "CS7100 290:TAKARAZUKA SKY STAGE 305:チャンネル銀河 歴史ドラマ・サスペンス・日本のうた 311:AXN 海外ドラマ 333:アニメシアターX（AT-X） 343:ナショナル ジオグラフィック 353:BBCワールドニュース", 1893000, 0x7100 },
+	{ 120, "CS7140",	1973000, 0x7140 },
 
 	{ 236, "BSアニマックス",	1164560, 0x4671 },
+	{ 244, "JSPORTS3",	1433080, 0x4751 },
 };
 
-static struct channel *
-lookup_channel(int id, struct channel *channels, int nr)
+struct channel *lookup_channel(int id, struct channel *channels, int nr)
 {
 	int i;
 	struct channel *channel;
@@ -63,7 +65,7 @@ lookup_channel(int id, struct channel *channels, int nr)
 	return NULL;
 }
 
-static int search(int adapter_nr, int channel_id)
+int search(int adapter_nr, int channel_id)
 {
 	char file[256];
 	int fd;
@@ -83,13 +85,11 @@ static int search(int adapter_nr, int channel_id)
 		perror("ioctl FE_GET_INFO");
 		goto out;
 	}
-	if (info.type == FE_QPSK) {
-		channel = lookup_channel(channel_id, isdbs_channels,
-					 ARRAY_SIZE(isdbs_channels));
-	} else if (info.type == FE_OFDM) {
-		channel = lookup_channel(channel_id, isdbt_channels,
-					 ARRAY_SIZE(isdbt_channels));
-	} else {
+	if (info.type == FE_QPSK)
+		channel = lookup_channel(channel_id, isdbs_channels, ARRAY_SIZE(isdbs_channels));
+	else if (info.type == FE_OFDM)
+		channel = lookup_channel(channel_id, isdbt_channels, ARRAY_SIZE(isdbt_channels));
+	else {
 		fprintf(stderr, "Unknown type of adapter\n");
 		goto out;
 	}
@@ -112,26 +112,26 @@ static int search(int adapter_nr, int channel_id)
 
 	prop[0].cmd = DTV_STAT_CNR;
 	props.num = 1;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < 8; i++) {
 		if ((ioctl(fd, FE_READ_STATUS, &status) < 0) || (ioctl(fd, FE_GET_PROPERTY, &props) < 0)) {
 			perror("ioctl FE_READ_STATUS / FE_GET_PROPERTY");
 			goto out;
 		}
 		if ((status & FE_HAS_LOCK) && prop[0].u.st.stat[0].svalue) {
-			fprintf(stderr, "Successfully tuned to %s, %f dB\n",
-				channel->name, ((double)prop[0].u.st.stat[0].svalue)/10000.);
+			fprintf(stderr, "#%d Successfully tuned to %s, %f dB\n",
+				adapter_nr, channel->name, ((double)prop[0].u.st.stat[0].svalue)/10000.);
 			return 0;
 		}
-		usleep(250 * 1000);
+		usleep(125 * 1000);
 	}
-	fprintf(stderr, "Failed to tune to %s (status %02x).\n",
-		channel->name, status);
+	fprintf(stderr, "#%d Failed to tune to %s (status %02x)\n",
+		adapter_nr, channel->name, status);
 out:
 	close(fd);
 	return -1;
 }
 
-static int track(int adapter_nr)
+int track(int adapter_nr)
 {
 	char file[256];
 	int fd;

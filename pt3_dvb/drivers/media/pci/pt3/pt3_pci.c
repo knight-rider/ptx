@@ -349,7 +349,7 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	for (i = 0; i < PT3_ADAPN; i++) {
-		fe[i] = tc90522_attach(&pt3->i2c, i, cfg[i].type, cfg[i].addr_demod, i + 1 == PT3_ADAPN);
+		fe[i] = tc90522_attach(&pt3->i2c, cfg[i].type, cfg[i].addr_demod, i + 1 == PT3_ADAPN);
 		if (!fe[i] || (cfg[i].type == SYS_ISDBS ?
 			qm1d1c0042_attach(fe[i], i, cfg[i].addr_tuner) : mxl301rf_attach(fe[i], i, cfg[i].addr_tuner))) {
 			while (i--)

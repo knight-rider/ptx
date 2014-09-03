@@ -23,9 +23,9 @@
 #include "dvb_frontend.h"
 
 #if IS_ENABLED(CONFIG_DVB_TC90522)
-extern struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, u8 idx, fe_delivery_system_t type, u8 addr_demod, bool pwr);
+extern struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_t type, u8 addr_demod, bool pwr);
 #else
-static inline struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, u8 idx, fe_delivery_system_t type, u8 addr_demod, bool pwr)
+static inline struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_t type, u8 addr_demod, bool pwr)
 {
 	pr_warn("%s: driver disabled by Kconfig\n", __func__);
 	return NULL;
