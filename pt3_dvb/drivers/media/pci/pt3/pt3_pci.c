@@ -70,12 +70,12 @@ int pt3_update_lnb(struct pt3_board *pt3)
 		struct pt3_adapter *adap;
 		for (i = 0; i < PT3_ADAPN; i++) {
 			adap = pt3->adap[i];
-			pr_debug("#%d sleep %d\n", adap->idx, adap->sleep);
+			dev_dbg(adap->dvb.device, "#%d sleep %d\n", adap->idx, adap->sleep);
 			if ((pt3_cfg[i].type == SYS_ISDBS) && (!adap->sleep))
 				lnb_eff |= adap->voltage ? adap->voltage : lnb;
 		}
 		if (unlikely(lnb_eff < 0 || 2 < lnb_eff)) {
-			pr_err("Inconsistent LNB settings\n");
+			dev_err(&pt3->pdev->dev, "Inconsistent LNB settings\n");
 			return -EINVAL;
 		}
 		if (pt3->lnb != lnb_eff) {
@@ -83,7 +83,7 @@ int pt3_update_lnb(struct pt3_board *pt3)
 			pt3->lnb = lnb_eff;
 		}
 	}
-	pr_debug("LNB=%s\n", pt3_lnb[lnb_eff].str);
+	dev_dbg(&pt3->pdev->dev, "LNB=%s\n", pt3_lnb[lnb_eff].str);
 	return 0;
 }
 
@@ -92,14 +92,14 @@ int pt3_thread(void *data)
 	size_t ret;
 	struct pt3_adapter *adap = data;
 
-	pr_debug("#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
+	dev_dbg(adap->dvb.device, "#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
 	set_freezable();
 	while (!kthread_should_stop()) {
 		try_to_freeze();
 		while ((ret = pt3_dma_copy(adap->dma, &adap->demux)) > 0)
 			;
 		if (ret < 0) {
-			pr_debug("#%d fail dma_copy\n", adap->idx);
+			dev_dbg(adap->dvb.device, "#%d fail dma_copy\n", adap->idx);
 			msleep_interruptible(1);
 		}
 	}
@@ -110,9 +110,9 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 {
 	int ret = 0;
 	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
-	pr_debug("#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
+	dev_dbg(adap->dvb.device, "#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
 	if (!adap->users++) {
-		pr_debug("#%d %s selected, DMA %s\n",
+		dev_dbg(adap->dvb.device, "#%d %s selected, DMA %s\n",
 			adap->idx, (pt3_cfg[adap->idx].type == SYS_ISDBS) ? "S" : "T",
 			pt3_dma_get_status(adap->dma) & 1 ? "ON" : "OFF");
 		mutex_lock(&adap->lock);
@@ -136,12 +136,12 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 int pt3_stop_feed(struct dvb_demux_feed *feed)
 {
 	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
-	pr_debug("#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
+	dev_dbg(adap->dvb.device, "#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
 	if (!--adap->users) {
 		mutex_lock(&adap->lock);
 		if (adap->kthread) {
 			pt3_dma_set_enabled(adap->dma, false);
-			pr_debug("#%d DMA ts_err packet cnt %d\n",
+			dev_dbg(adap->dvb.device, "#%d DMA ts_err packet cnt %d\n",
 				adap->idx, pt3_dma_get_ts_error_packet_count(adap->dma));
 			kthread_stop(adap->kthread);
 			adap->kthread = NULL;
@@ -170,7 +170,7 @@ struct pt3_adapter *pt3_dvb_register_adapter(struct pt3_board *pt3)
 	dvb = &adap->dvb;
 	dvb->priv = adap;
 	ret = dvb_register_adapter(dvb, DRV_NAME, THIS_MODULE, &pt3->pdev->dev, adapter_nr);
-	pr_debug("adapter%d registered\n", ret);
+	dev_dbg(dvb->device, "adapter%d registered\n", ret);
 	if (ret >= 0) {
 		demux = &adap->demux;
 		demux->dmx.capabilities = DMX_TS_FILTERING | DMX_SECTION_FILTERING;
@@ -200,7 +200,7 @@ struct pt3_adapter *pt3_dvb_register_adapter(struct pt3_board *pt3)
 int pt3_sleep(struct dvb_frontend *fe)
 {
 	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
-	pr_debug("#%d %s orig %p\n", adap->idx, __func__, adap->orig_sleep);
+	dev_dbg(adap->dvb.device, "#%d %s orig %p\n", adap->idx, __func__, adap->orig_sleep);
 	adap->sleep = true;
 	pt3_update_lnb(adap->pt3);
 	return (adap->orig_sleep) ? adap->orig_sleep(fe) : 0;
@@ -209,7 +209,7 @@ int pt3_sleep(struct dvb_frontend *fe)
 int pt3_wakeup(struct dvb_frontend *fe)
 {
 	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
-	pr_debug("#%d %s orig %p\n", adap->idx, __func__, adap->orig_init);
+	dev_dbg(adap->dvb.device, "#%d %s orig %p\n", adap->idx, __func__, adap->orig_init);
 	adap->sleep = false;
 	pt3_update_lnb(adap->pt3);
 	return (adap->orig_init) ? adap->orig_init(fe) : 0;
@@ -351,7 +351,7 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	for (i = 0; i < PT3_ADAPN; i++) {
 		fe[i] = tc90522_attach(&pt3->i2c, cfg[i].type, cfg[i].addr_demod, i + 1 == PT3_ADAPN);
 		if (!fe[i] || (cfg[i].type == SYS_ISDBS ?
-			qm1d1c0042_attach(fe[i], i, cfg[i].addr_tuner) : mxl301rf_attach(fe[i], i, cfg[i].addr_tuner))) {
+			qm1d1c0042_attach(fe[i], cfg[i].addr_tuner) : mxl301rf_attach(fe[i], cfg[i].addr_tuner))) {
 			while (i--)
 				fe[i]->ops.release(fe[i]);
 			return pt3_abort(pdev, -ENOMEM, "Cannot attach frontend\n");
@@ -360,14 +360,15 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	for (i = 0; i < PT3_ADAPN; i++) {
 		struct pt3_adapter *adap = pt3->adap[i];
-		pr_debug("#%d %s\n", i, __func__);
+		dev_dbg(&pdev->dev, "#%d %s\n", i, __func__);
 
-		adap->orig_voltage     = fe[i]->ops.set_voltage;
-		adap->orig_sleep       = fe[i]->ops.sleep;
-		adap->orig_init        = fe[i]->ops.init;
-		fe[i]->ops.set_voltage = pt3_set_voltage;
-		fe[i]->ops.sleep       = pt3_sleep;
-		fe[i]->ops.init        = pt3_wakeup;
+		adap->orig_voltage	= fe[i]->ops.set_voltage;
+		adap->orig_sleep	= fe[i]->ops.sleep;
+		adap->orig_init		= fe[i]->ops.init;
+		fe[i]->ops.set_voltage	= pt3_set_voltage;
+		fe[i]->ops.sleep	= pt3_sleep;
+		fe[i]->ops.init		= pt3_wakeup;
+		fe[i]->dvb		= &adap->dvb;
 		if ((adap->orig_init(fe[i]) && adap->orig_init(fe[i]) && adap->orig_init(fe[i])) ||
 			adap->orig_sleep(fe[i]) || dvb_register_frontend(&adap->dvb, fe[i])) {
 			while (i--)

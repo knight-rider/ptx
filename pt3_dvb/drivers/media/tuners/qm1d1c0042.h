@@ -17,17 +17,14 @@
 #ifndef __QM1D1C0042_H__
 #define __QM1D1C0042_H__
 
-#ifndef pr_fmt
- #define pr_fmt(fmt) KBUILD_MODNAME " " fmt
-#endif
 #include "dvb_frontend.h"
 
 #if IS_ENABLED(CONFIG_MEDIA_TUNER_QM1D1C0042)
-extern int qm1d1c0042_attach(struct dvb_frontend *fe, u8 idx, u8 addr_tuner);
+extern int qm1d1c0042_attach(struct dvb_frontend *fe, u8 addr_tuner);
 #else
-static inline int qm1d1c0042_attach(struct dvb_frontend *fe, u8 idx, u8 addr_tuner)
+static inline int qm1d1c0042_attach(struct dvb_frontend *fe, u8 addr_tuner)
 {
-	pr_warn("%s: driver disabled by Kconfig\n", __func__);
+	dev_warn(fe->dvb->device, "%s: driver disabled by Kconfig\n", __func__);
 	return 0;
 }
 #endif

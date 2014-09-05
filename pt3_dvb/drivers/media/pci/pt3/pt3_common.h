@@ -17,8 +17,6 @@
 #ifndef	__PT3_COMMON_H__
 #define	__PT3_COMMON_H__
 
-#define pr_fmt(fmt) KBUILD_MODNAME " " fmt
-
 #include <linux/pci.h>
 #include <linux/kthread.h>
 #include <linux/freezer.h>

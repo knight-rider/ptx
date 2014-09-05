@@ -127,7 +127,7 @@ int pt3_i2c_flush(struct pt3_board *pt3, bool end, u32 start_addr)
 	writel(1 << 16 | start_addr, pt3->bar_reg + PT3_REG_I2C_W);	/* 0x00010000 start sequence */
 	pt3_i2c_wait(pt3, &status);
 	if (status & 0b0110) {						/* ACK status */
-		pr_err("%s failed, status=0x%x\n", __func__, status);
+		dev_err(&pt3->i2c.dev, "%s %s failed, status=0x%x\n", pt3->i2c.name, __func__, status);
 		return -EIO;
 	}
 	return 0;

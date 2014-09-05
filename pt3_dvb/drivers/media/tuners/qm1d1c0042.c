@@ -95,15 +95,12 @@ enum qm1d1c0042_agc {
 
 int qm1d1c0042_set_agc(struct dvb_frontend *fe, enum qm1d1c0042_agc agc)
 {
-	struct qm1d1c0042 *qm = fe->tuner_priv;
-	static u8 agc_data_s[2] = { 0xb0, 0x30 };
 	u8 data = (agc == QM1D1C0042_AGC_AUTO) ? 0xff : 0x00;
 	int ret = qm1d1c0042_fe_write_data(fe, 0x0a, &data, 1);
 	if (ret)
 		return ret;
 
-	data = agc_data_s[(qm->idx >> 1) & 1];
-	data |= (agc == QM1D1C0042_AGC_AUTO) ? 0x01 : 0x00;
+	data = 0xb0 | (agc == QM1D1C0042_AGC_AUTO) ? 1 : 0;
 	ret = qm1d1c0042_fe_write_data(fe, 0x10, &data, 1);
 	if (ret)
 		return ret;
@@ -116,7 +113,7 @@ int qm1d1c0042_sleep(struct dvb_frontend *fe)
 {
 	struct qm1d1c0042 *qm = fe->tuner_priv;
 	u8 buf = 1;
-	pr_debug("#%d %s\n", qm->idx, __func__);
+	dev_dbg(fe->dvb->device, "#%d %s\n", qm->idx, __func__);
 
 	qm->reg[0x01] &= (~(1 << 3)) & 0xff;
 	qm->reg[0x01] |= 1 << 0;
@@ -131,7 +128,7 @@ int qm1d1c0042_wakeup(struct dvb_frontend *fe)
 {
 	struct qm1d1c0042 *qm = fe->tuner_priv;
 	u8 buf = 0;
-	pr_debug("#%d %s\n", qm->idx, __func__);
+	dev_dbg(fe->dvb->device, "#%d %s\n", qm->idx, __func__);
 
 	qm->reg[0x01] |= 1 << 3;
 	qm->reg[0x01] &= (~(1 << 0)) & 0xff;
@@ -169,31 +166,31 @@ static const u32 qm1d1c0042_freq_tab[9][3] = {
 	{  950000, 0, 0 }
 };
 
-static const u32 qm1d1c0042_sd_tab[24][2][3] = {
-	{{0x38fae1, 0x0d, 0x5}, {0x39fae1, 0x0d, 0x5},},
-	{{0x3f570a, 0x0e, 0x3}, {0x00570a, 0x0e, 0x3},},
-	{{0x05b333, 0x0e, 0x5}, {0x06b333, 0x0e, 0x5},},
-	{{0x3c0f5c, 0x0f, 0x4}, {0x3d0f5c, 0x0f, 0x4},},
-	{{0x026b85, 0x0f, 0x6}, {0x036b85, 0x0f, 0x6},},
-	{{0x38c7ae, 0x10, 0x5}, {0x39c7ae, 0x10, 0x5},},
-	{{0x3f23d7, 0x11, 0x3}, {0x0023d7, 0x11, 0x3},},
-	{{0x058000, 0x11, 0x5}, {0x068000, 0x11, 0x5},},
-	{{0x3bdc28, 0x12, 0x4}, {0x3cdc28, 0x12, 0x4},},
-	{{0x023851, 0x12, 0x6}, {0x033851, 0x12, 0x6},},
-	{{0x38947a, 0x13, 0x5}, {0x39947a, 0x13, 0x5},},
-	{{0x3ef0a3, 0x14, 0x3}, {0x3ff0a3, 0x14, 0x3},},
-	{{0x3c8000, 0x16, 0x4}, {0x3d8000, 0x16, 0x4},},
-	{{0x048000, 0x16, 0x6}, {0x058000, 0x16, 0x6},},
-	{{0x3c8000, 0x17, 0x5}, {0x3d8000, 0x17, 0x5},},
-	{{0x048000, 0x18, 0x3}, {0x058000, 0x18, 0x3},},
-	{{0x3c8000, 0x18, 0x6}, {0x3d8000, 0x18, 0x6},},
-	{{0x048000, 0x19, 0x4}, {0x058000, 0x19, 0x4},},
-	{{0x3c8000, 0x1a, 0x3}, {0x3d8000, 0x1a, 0x3},},
-	{{0x048000, 0x1a, 0x5}, {0x058000, 0x1a, 0x5},},
-	{{0x3c8000, 0x1b, 0x4}, {0x3d8000, 0x1b, 0x4},},
-	{{0x048000, 0x1b, 0x6}, {0x058000, 0x1b, 0x6},},
-	{{0x3c8000, 0x1c, 0x5}, {0x3d8000, 0x1c, 0x5},},
-	{{0x048000, 0x1d, 0x3}, {0x058000, 0x1d, 0x3},},
+static const u32 qm1d1c0042_sd_tab[24][3] = {
+	{0x38fae1, 0x0d, 0x5},
+	{0x3f570a, 0x0e, 0x3},
+	{0x05b333, 0x0e, 0x5},
+	{0x3c0f5c, 0x0f, 0x4},
+	{0x026b85, 0x0f, 0x6},
+	{0x38c7ae, 0x10, 0x5},
+	{0x3f23d7, 0x11, 0x3},
+	{0x058000, 0x11, 0x5},
+	{0x3bdc28, 0x12, 0x4},
+	{0x023851, 0x12, 0x6},
+	{0x38947a, 0x13, 0x5},
+	{0x3ef0a3, 0x14, 0x3},
+	{0x3c8000, 0x16, 0x4},
+	{0x048000, 0x16, 0x6},
+	{0x3c8000, 0x17, 0x5},
+	{0x048000, 0x18, 0x3},
+	{0x3c8000, 0x18, 0x6},
+	{0x048000, 0x19, 0x4},
+	{0x3c8000, 0x1a, 0x3},
+	{0x048000, 0x1a, 0x5},
+	{0x3c8000, 0x1b, 0x4},
+	{0x048000, 0x1b, 0x6},
+	{0x3c8000, 0x1c, 0x5},
+	{0x048000, 0x1d, 0x3},
 };
 
 static int qm1d1c0042_tuning(struct qm1d1c0042 *qm, u32 *sd, u32 channel)
@@ -201,7 +198,7 @@ static int qm1d1c0042_tuning(struct qm1d1c0042 *qm, u32 *sd, u32 channel)
 	int ret;
 	struct dvb_frontend *fe = qm->fe;
 	u8 i_data;
-	u32 i, N, A, index = (qm->idx >> 1) & 1;
+	u32 i, N, A;
 
 	qm->reg[0x08] &= 0xf0;
 	qm->reg[0x08] |= 0x09;
@@ -219,9 +216,9 @@ static int qm1d1c0042_tuning(struct qm1d1c0042 *qm, u32 *sd, u32 channel)
 		}
 	}
 
-	*sd = qm1d1c0042_sd_tab[channel][index][0];
-	N = qm1d1c0042_sd_tab[channel][index][1];
-	A = qm1d1c0042_sd_tab[channel][index][2];
+	*sd = qm1d1c0042_sd_tab[channel][0];
+	N = qm1d1c0042_sd_tab[channel][1];
+	A = qm1d1c0042_sd_tab[channel][2];
 
 	qm->reg[0x06] &= 0x40;
 	qm->reg[0x06] |= N;
@@ -307,7 +304,7 @@ int qm1d1c0042_set_freq(struct dvb_frontend *fe, u32 frequency)
 {
 	struct qm1d1c0042 *qm = fe->tuner_priv;
 	u32 channel = qm1d1c0042_freq2ch(frequency);
-	u32 number, freq, freq_kHz;
+	u32 number, freq;
 	bool locked = false;
 	unsigned long timeout;
 	int err = qm1d1c0042_set_agc(fe, QM1D1C0042_AGC_MANUAL);
@@ -315,13 +312,8 @@ int qm1d1c0042_set_freq(struct dvb_frontend *fe, u32 frequency)
 		return err;
 
 	qm1d1c0042_get_channel_freq(channel, &number, &freq);
-	freq_kHz = freq * 10;
-	if (((qm->idx >> 1) & 1) == 0)
-		freq_kHz -= 500;
-	else
-		freq_kHz += 500;
-	qm->freq = freq_kHz;
-	pr_debug("#%d ch %d freq %d kHz\n", qm->idx, channel, freq_kHz);
+	qm->freq = freq * 10 - 500;
+	dev_dbg(fe->dvb->device, "#%d ch %d freq %d kHz\n", qm->idx, channel, qm->freq);
 
 	err = qm1d1c0042_local_lpf_tuning(qm, channel);
 	if (err)
@@ -336,7 +328,7 @@ int qm1d1c0042_set_freq(struct dvb_frontend *fe, u32 frequency)
 			break;
 		msleep_interruptible(1);
 	}
-	pr_debug("#%d %s %s\n", qm->idx, __func__, locked ? "LOCKED" : "TIMEOUT");
+	dev_dbg(fe->dvb->device, "#%d %s %s\n", qm->idx, __func__, locked ? "LOCKED" : "TIMEOUT");
 	return locked ? qm1d1c0042_set_agc(fe, QM1D1C0042_AGC_AUTO) : -ETIMEDOUT;
 }
 
@@ -359,7 +351,7 @@ static struct dvb_tuner_ops qm1d1c0042_ops = {
 	.release = qm1d1c0042_release,
 };
 
-int qm1d1c0042_attach(struct dvb_frontend *fe, u8 idx, u8 addr_tuner)
+int qm1d1c0042_attach(struct dvb_frontend *fe, u8 addr_tuner)
 {
 	u8 d[] = { 0x10, 0x15, 0x04 };
 	struct qm1d1c0042 *qm = kzalloc(sizeof(struct qm1d1c0042), GFP_KERNEL);
@@ -367,8 +359,8 @@ int qm1d1c0042_attach(struct dvb_frontend *fe, u8 idx, u8 addr_tuner)
 		return -ENOMEM;
 	fe->tuner_priv = qm;
 	qm->fe = fe;
-	qm->idx = idx;
 	qm->addr_tuner = addr_tuner;
+	qm->idx = !(addr_tuner & 1);
 	memcpy(&fe->ops.tuner_ops, &qm1d1c0042_ops, sizeof(struct dvb_tuner_ops));
 
 	memcpy(qm->reg, qm1d1c0042_reg_rw, sizeof(qm1d1c0042_reg_rw));

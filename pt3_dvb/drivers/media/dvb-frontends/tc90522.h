@@ -17,9 +17,6 @@
 #ifndef	__TC90522_H__
 #define	__TC90522_H__
 
-#ifndef pr_fmt
- #define pr_fmt(fmt) KBUILD_MODNAME " " fmt
-#endif
 #include "dvb_frontend.h"
 
 #if IS_ENABLED(CONFIG_DVB_TC90522)
@@ -27,7 +24,7 @@ extern struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_
 #else
 static inline struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_t type, u8 addr_demod, bool pwr)
 {
-	pr_warn("%s: driver disabled by Kconfig\n", __func__);
+	dev_warn(&i2c->dev, "%s: driver disabled by Kconfig\n", __func__);
 	return NULL;
 }
 #endif

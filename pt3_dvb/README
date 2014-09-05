@@ -31,11 +31,12 @@ Features:
 - dropped FE's LNB control & other unused features
 - raw CNR for DVBv3 (.read_snr)
 - decibel scaled CNR for DVBv5 (@ .0001 dB)
+- converted pr_ to dev_
 
 Recent correspondence:
 Q Antti: For the next round you must split that patchset as one patch per driver.
-A DECLINED: This package contains PCI bridge, demod & tuner drivers.
-  Splitting will break the integrity & is just a stupid idea.
+A DECLINED: This package contains PCI bridge (including I2C & DMA handlers), demod & tuner drivers.
+  Splitting will break the integrity & only makes harder to review.
   It is up to the maintainers to review only drivers of interest...
 Q Antti: IMHO, the most correct implementation solution is use of I2C mux.
   https://i2c.wiki.kernel.org/index.php/I2C_bus_multiplexing
@@ -78,15 +79,16 @@ Q Antti: There is some issues as T and S mode driver instances registered to sam
   What happens if you are wathing T and try tune S at same time? (probably T breaks).
 A Nothing wrong. The chip can handle all 2ch T + 2ch S simultaneously.
 Q Antti: You must use dev_ functions for logging.
-A DECLINED: Some maintainers (I forgot their names, maybe you also?) asked to use pr_*.
+A DONE: with notes..
+  Some maintainers (I forgot their names, maybe you also?) asked to use pr_*.
   And I agreed with them. dev_* is used only in pt3_pci, the PCI bridge driver.
   IMHO pr_* is more suitable. We can change to dev_* if it is a must.
 Q Mauro: There's actually a order of preference for those printk macros.
   pr_* is better than using printk, but dev_* is a little better, as it
   would save you from adding the demod->idx to the printk calls, as it will use the device name instead.
-A DECLINED: This is NOT correct. Proof follows:
+A This is NOT fully correct.
   Only one I2C device is registered.
-  Since all 4 demods share the same I2C device, dev_ will print
+  Since all 4 demods share the same I2C, dev_ will print
 
 May 21 05:38:17 puma kernel: i2c i2c-7: #0 tc90522_wakeup S
 May 21 05:38:17 puma kernel: i2c i2c-7: #0 tc90522_sleep S

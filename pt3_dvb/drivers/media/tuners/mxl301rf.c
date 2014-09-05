@@ -107,7 +107,7 @@ int mxl301rf_freq(int freq)
 	return MXL301RF_NHK;
 }
 
-void mxl301rf_rftune(u8 *data, u32 *size, u32 freq)
+void mxl301rf_rftune(struct dvb_frontend *fe, u8 *data, u32 *size, u32 freq)
 {
 	u32 dig_rf_freq, tmp, frac_divider, kHz, MHz, i;
 	u8 rf_data[] = {
@@ -158,7 +158,7 @@ void mxl301rf_rftune(u8 *data, u32 *size, u32 freq)
 	memcpy(data, rf_data, sizeof(rf_data));
 	*size = sizeof(rf_data);
 
-	pr_debug("mx_rftune freq=%d\n", freq);
+	dev_dbg(fe->dvb->device, "mx_rftune freq=%d\n", freq);
 }
 
 /* write via demodulator */
@@ -286,7 +286,7 @@ bool mxl301rf_locked(struct dvb_frontend *fe)
 			break;
 		msleep_interruptible(1);
 	}
-	pr_debug("#%d %s lock1=%d lock2=%d\n", ((struct mxl301rf *)fe->tuner_priv)->idx, __func__, locked1, locked2);
+	dev_dbg(fe->dvb->device, "#%d %s lock1=%d lock2=%d\n", ((struct mxl301rf *)fe->tuner_priv)->idx, __func__, locked1, locked2);
 	return locked1 && locked2 ? !mxl301rf_set_agc(fe, MXL301RF_AGC_AUTO) : false;
 }
 
@@ -300,9 +300,9 @@ int mxl301rf_tuner_rftune(struct dvb_frontend *fe, u32 freq)
 		return err;
 
 	mx->freq = freq;
-	mxl301rf_rftune(data, &size, freq);
+	mxl301rf_rftune(fe, data, &size, freq);
 	if (size != 20) {
-		pr_debug("fail mx_rftune size = %d\n", size);
+		dev_dbg(fe->dvb->device, "fail mx_rftune size = %d\n", size);
 		return -EINVAL;
 	}
 	mxl301rf_fe_write_tuner(fe, data, 14);
@@ -371,7 +371,7 @@ static struct dvb_tuner_ops mxl301rf_ops = {
 	.release = mxl301rf_release,
 };
 
-int mxl301rf_attach(struct dvb_frontend *fe, u8 idx, u8 addr_tuner)
+int mxl301rf_attach(struct dvb_frontend *fe, u8 addr_tuner)
 {
 	u8 d[] = { 0x10, 0x01 };
 	struct mxl301rf *mx = kzalloc(sizeof(struct mxl301rf), GFP_KERNEL);
@@ -379,7 +379,7 @@ int mxl301rf_attach(struct dvb_frontend *fe, u8 idx, u8 addr_tuner)
 		return -ENOMEM;
 	fe->tuner_priv = mx;
 	mx->fe = fe;
-	mx->idx = idx;
+	mx->idx = (addr_tuner & 1) | 2;
 	mx->addr_tuner = addr_tuner;
 	memcpy(&fe->ops.tuner_ops, &mxl301rf_ops, sizeof(struct dvb_tuner_ops));
 
