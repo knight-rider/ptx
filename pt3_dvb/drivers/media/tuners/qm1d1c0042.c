@@ -100,7 +100,7 @@ int qm1d1c0042_set_agc(struct dvb_frontend *fe, enum qm1d1c0042_agc agc)
 	if (ret)
 		return ret;
 
-	data = 0xb0 | (agc == QM1D1C0042_AGC_AUTO) ? 1 : 0;
+	data = 0xb0 | ((agc == QM1D1C0042_AGC_AUTO) ? 1 : 0);
 	ret = qm1d1c0042_fe_write_data(fe, 0x10, &data, 1);
 	if (ret)
 		return ret;
