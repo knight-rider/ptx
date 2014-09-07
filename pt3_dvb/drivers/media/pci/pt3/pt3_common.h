@@ -24,7 +24,7 @@
 #include "dmxdev.h"
 #include "dvb_frontend.h"
 
-#define DRV_NAME "pt3_dvb"
+#define DRV_NAME KBUILD_MODNAME
 
 /* register idx */
 #define PT3_REG_VERSION	0x00	/*	R	Version		*/

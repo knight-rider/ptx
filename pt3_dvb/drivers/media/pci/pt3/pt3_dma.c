@@ -1,5 +1,5 @@
 /*
- * DVB driver for Earthsoft PT3 ISDB-S/T PCI-E card
+ * DMA handler for Earthsoft PT3 ISDB-S/T PCI-E card DVB driver
  *
  * Copyright (C) 2013 Budi Rachmanto, AreMa Inc. <info@are.ma>
  *

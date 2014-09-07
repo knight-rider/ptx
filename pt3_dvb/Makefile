@@ -2,7 +2,8 @@ DEFS := -DCONFIG_DVB_TC90522 -DCONFIG_MEDIA_TUNER_QM1D1C0042 -DCONFIG_MEDIA_TUNE
 
 SRCS := $(shell cd $(PWD); find -iname "*.c" -o -iname "*.h")
 INCS := $(addprefix -I$(PWD)/, $(sort $(dir $(SRCS))))
-TARGET := $(shell eval `sed -e "s/\[0\]//" $(PWD)/dkms.conf`; echo $${PACKAGE_NAME}).ko
+KBUILD_MODNAME := $(shell eval `sed -e "s/\[0\]//" $(PWD)/dkms.conf`; echo $${PACKAGE_NAME})
+TARGET := $(KBUILD_MODNAME).ko
 KVER ?= `uname -r`
 KBUILD := /lib/modules/$(KVER)/build
 INSTALL_DIR := /lib/modules/$(KVER)/$(shell eval `sed -e "s/\[0\]//" $(PWD)/dkms.conf`; echo $${DEST_MODULE_LOCATION})
