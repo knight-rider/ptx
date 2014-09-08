@@ -161,10 +161,16 @@ int track(int adapter_nr)
 }
 
 int main(int argc, char *argv[]) {
-	int adapter_nr, channel_id, fd, ret;
+	int adapter_nr, channel_id, fd, i, ret;
 
 	if (argc <= 2) {
 		fprintf(stderr, "Usage: %s adapter_no channel_id\n", argv[0]);
+		fprintf(stderr, "\nSatellite channels:\n");
+		for (i = 0; i < ARRAY_SIZE(isdbs_channels); i++)
+			fprintf(stderr, "	%d	%s\n", isdbs_channels[i].id, isdbs_channels[i].name);
+		fprintf(stderr, "\nTerrestrial channels:\n");
+		for (i = 0; i < ARRAY_SIZE(isdbt_channels); i++)
+			fprintf(stderr, "	%d	%s\n", isdbt_channels[i].id, isdbt_channels[i].name);
 		return 1;
 	}
 	adapter_nr = strtol(argv[1], NULL, 0);
