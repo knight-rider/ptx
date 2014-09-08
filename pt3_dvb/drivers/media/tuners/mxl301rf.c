@@ -250,14 +250,6 @@ int mxl301rf_sleep(struct dvb_frontend *fe)
 	return mxl301rf_fe_write_data(fe, 0x03, &buf, 1);
 }
 
-static const u8 mxl301rf_freq_tab[][3] = {
-	{   2, 0,  3 },
-	{  12, 1, 22 },
-	{  21, 0, 12 },
-	{  62, 1, 63 },
-	{ 112, 0, 62 }
-};
-
 bool mxl301rf_rfsynth_locked(struct dvb_frontend *fe)
 {
 	u8 data;
@@ -328,28 +320,6 @@ int mxl301rf_wakeup(struct dvb_frontend *fe)
 	mxl301rf_fe_write_tuner(fe, data, sizeof(data));
 	mxl301rf_tuner_rftune(fe, mx->freq);
 	return 0;
-}
-
-void mxl301rf_ch2freq(u32 channel, bool *catv, u32 *number, u32 *freq)
-{
-	u32 i;
-	s32 freq_offset = 0;
-
-	if (12 <= channel)
-		freq_offset += 2;
-	if (17 <= channel)
-		freq_offset -= 2;
-	if (63 <= channel)
-		freq_offset += 2;
-	*freq = 93 + channel * 6 + freq_offset;
-
-	for (i = 0; i < ARRAY_SIZE(mxl301rf_freq_tab); i++) {
-		if (channel <= mxl301rf_freq_tab[i][0]) {
-			*catv = mxl301rf_freq_tab[i][1] ? true : false;
-			*number = channel + mxl301rf_freq_tab[i][2] - mxl301rf_freq_tab[i][0];
-			break;
-		}
-	}
 }
 
 int mxl301rf_release(struct dvb_frontend *fe)
