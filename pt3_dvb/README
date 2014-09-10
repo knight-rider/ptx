@@ -3,12 +3,16 @@ DVB driver for Earthsoft PT3 (PCIE ISDB-S/T receiver)
 
 Status: STABLE
 
-Behavior: same as PT1 DVB, plus some tuning enhancements
+Features:
+- tuning enhancements (compared to PT1 DVB)
 1. in addition to the real frequency:
 	ISDB-S : freq. channel ID
 	ISDB-T : freq# (I/O# +128), ch#, ch# +64 for CATV
 2. in addition to TSID:
 	ISDB-S : slot#
+- allocated devices
+	ISDB-S : /dev/dvb/adapter0, /dev/dvb/adapter1
+	ISDB-T : /dev/dvb/adapter2, /dev/dvb/adapter3
 
 Main components:
 1. Sharp	VA4M6JC2103	: contains 2 ISDB-S + 2 ISDB-T tuners
@@ -16,7 +20,6 @@ Main components:
 	ISDB-T : MaxLinear CMOS Hybrid TV MxL301RF
 2. Toshiba	TC90522XBG	: quad demodulator (2ch OFDM + 2ch 8PSK)
 3. Altera	EP4CGX15BF14C8N	: customized FPGA PCI bridge
-4. ESMT		M12L16161A-7TG	: on-board memory
 
 Full package:
 - URL:	https://github.com/knight-rider/ptx/tree/master/pt3_dvb
@@ -24,86 +27,4 @@ Full package:
 - installation:
 	$ chmod +x dkms.install dkms.uninstall
 	$ ./dkms.install
-
-Features:
-- dropped verbosity (debug levels), use single level -DDEBUG instead
-- translated to standard (?) I2C protocol
-- dropped FE's LNB control & other unused features
-- raw CNR for DVBv3 (.read_snr)
-- decibel scaled CNR for DVBv5 (@ .0001 dB)
-- converted pr_ to dev_
-
-Recent correspondence:
-Q Antti: For the next round you must split that patchset as one patch per driver.
-A DECLINED: This package contains PCI bridge (including I2C & DMA handlers), demod & tuner drivers.
-  Splitting will break the integrity & only makes harder to review.
-  It is up to the maintainers to review only drivers of interest...
-Q Antti: IMHO, the most correct implementation solution is use of I2C mux.
-  https://i2c.wiki.kernel.org/index.php/I2C_bus_multiplexing
-  See implementation example from rtl2832 and si2168 drivers.
-  I encourage you to use RegMap API
-  Implementation example could be found from e4000 driver at least.
-A DECLINED: Good recommendation & taken into consideration.
-  However, this driver is already in stable status, tested & running well.
-  Changing communication protocol is very risky & will cause tons of bugs.
-  Unless it is a must, this method is not likely to be taken.
-  FYI, the only document available is SDK from PT3 card maker, Earthsoft.
-  No guarantee this driver works in other cards.
-Q Antti: Masking return statuses does not look good nor clear
-A DECLINED: We only want to know & stop if an error occured. It is enough.
-Q Antti: Global static variable looks very bad
-A DONE: removed, pt3_pci now decides when to ignit demod chip
-Q Antti: Overall tc90522 driver looks very complex. One reason is that HW algo used.
-  I cannot see any reason why it is used,
-  just change default SW algo and implement things more likely others are doing.
-  Basically it is callback which dvb core uses to tune device. However, thee
-  is complex state machine implemented. State machine state is updated by
-  read_status() callback, which is *not* ran by DVB core when that HW aldo is
-  used. How that can work? You need to call FE status from userspace in order
-  to update state machine? If your app does not call status, that does not
-  work at all?
-A DECLINED: You are WRONG. dvb-core runs the iteration.
-Q Mauro: If the device doesn't have a hardware zig-zag, and you don't use
-  the SW algo, then it may fail to tune to some transponders.
-  On the devices with SW algo, the status updates happen at the read_status()
-  call. On your implementation, you're doing it at ops.tune() callback,
-  with seems OK on my eyes.
-  As I said, that depends if the HW (or firmware) already does frequency
-  zig-zag or not. If it does, this implementation is better. However, if
-  it doesn't, you should convert to use SW algo.
-A DONE: That's it! The chip seems to be smart enough & user only needs to check the lock.
-Q Antti: Driver should not need index at all. It could be found from the frontend
-  pointer after registration, but still not needed.
-A DONE: removed, but If you read the source thoroughly, you will find idx is used only for debugging
-Q Antti: There is some issues as T and S mode driver instances registered to same chip.
-  What happens if you are wathing T and try tune S at same time? (probably T breaks).
-A Nothing wrong. The chip can handle all 2ch T + 2ch S simultaneously.
-Q Antti: You must use dev_ functions for logging.
-A DONE: with notes..
-  Some maintainers (I forgot their names, maybe you also?) asked to use pr_*.
-  And I agreed with them. dev_* is used only in pt3_pci, the PCI bridge driver.
-  IMHO pr_* is more suitable. We can change to dev_* if it is a must.
-Q Mauro: There's actually a order of preference for those printk macros.
-  pr_* is better than using printk, but dev_* is a little better, as it
-  would save you from adding the demod->idx to the printk calls, as it will use the device name instead.
-A This is NOT fully correct.
-  Only one I2C device is registered.
-  Since all 4 demods share the same I2C, dev_ will print
-
-May 21 05:38:17 puma kernel: i2c i2c-7: #0 tc90522_wakeup S
-May 21 05:38:17 puma kernel: i2c i2c-7: #0 tc90522_sleep S
-May 21 05:38:18 puma kernel: pt3_dvb 0000:03:00.0: DVB: registering
-adapter 0 frontend 0 (TC90522 ISDB-S)...
-May 21 05:38:18 puma kernel: i2c i2c-7: #1 tc90522_wakeup S
-May 21 05:38:18 puma kernel: i2c i2c-7: #1 tc90522_sleep S
-May 21 05:38:18 puma kernel: pt3_dvb 0000:03:00.0: DVB: registering
-adapter 1 frontend 0 (TC90522 ISDB-S)...
-May 21 05:38:18 puma kernel: i2c i2c-7: #2 tc90522_wakeup T
-May 21 05:38:18 puma kernel: i2c i2c-7: #2 tc90522_sleep T
-May 21 05:38:18 puma kernel: pt3_dvb 0000:03:00.0: DVB: registering
-adapter 2 frontend 0 (TC90522 ISDB-T)...
-May 21 05:38:18 puma kernel: i2c i2c-7: #3 tc90522_wakeup T
-May 21 05:38:19 puma kernel: i2c i2c-7: #3 tc90522_sleep T
-May 21 05:38:19 puma kernel: pt3_dvb 0000:03:00.0: DVB: registering
-adapter 3 frontend 0 (TC90522 ISDB-T)...
 
