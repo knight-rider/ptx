@@ -127,18 +127,16 @@ struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 {
 	struct pt3_dma_page *page;
 	u32 i;
-
 	struct pt3_dma *dma = kzalloc(sizeof(struct pt3_dma), GFP_KERNEL);
-	if (!dma) {
-		dev_dbg(adap->dvb.device, "#%d fail allocate PT3_DMA\n", adap->idx);
+
+	if (!dma)
 		goto fail;
-	}
 	dma->adap = adap;
 	dma->enabled = false;
 	mutex_init(&dma->lock);
 
 	dma->ts_count = PT3_DMA_BLOCK_COUNT;
-	dma->ts_info = kzalloc(sizeof(struct pt3_dma_page) * dma->ts_count, GFP_KERNEL);
+	dma->ts_info = kcalloc(dma->ts_count, sizeof(struct pt3_dma_page), GFP_KERNEL);
 	if (!dma->ts_info) {
 		dev_dbg(adap->dvb.device, "#%d fail allocate TS DMA page\n", adap->idx);
 		goto fail;
@@ -156,7 +154,7 @@ struct pt3_dma *pt3_dma_create(struct pt3_adapter *adap)
 	}
 
 	dma->desc_count = 1 + (PT3_DMA_TS_BUF_SIZE / PT3_DMA_PAGE_SIZE - 1) / PT3_DMA_MAX_DESCS;
-	dma->desc_info = kzalloc(sizeof(struct pt3_dma_page) * dma->desc_count, GFP_KERNEL);
+	dma->desc_info = kcalloc(dma->desc_count, sizeof(struct pt3_dma_page), GFP_KERNEL);
 	if (!dma->desc_info) {
 		dev_dbg(adap->dvb.device, "#%d fail allocate Desc DMA page\n", adap->idx);
 		goto fail;
@@ -250,6 +248,7 @@ void pt3_dma_set_test_mode(struct pt3_dma *dma, enum pt3_dma_mode mode, u16 init
 {
 	void __iomem *base = pt3_dma_get_base_addr(dma);
 	u32 data = mode | initval;
+
 	dev_dbg(dma->adap->dvb.device, "#%d %s base=%p data=0x%04x\n", dma->adap->idx, __func__, base, data);
 	writel(data, base + PT3_REG_TS_CTL);
 }
@@ -258,8 +257,8 @@ bool pt3_dma_ready(struct pt3_dma *dma)
 {
 	struct pt3_dma_page *ts;
 	u8 *p;
-
 	u32 next = dma->ts_pos + 1;
+
 	if (next >= dma->ts_count)
 		next = 0;
 	ts = &dma->ts_info[next];

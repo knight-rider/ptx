@@ -151,6 +151,7 @@ int pt3_i2c_xfer(struct i2c_adapter *i2c, struct i2c_msg *msg, int num)
 	pt3->i2c_addr = 0;
 	for (i = 0; i < num; i++) {
 		u8 byte = (msg[i].addr << 1) | (msg[i].flags & 1);
+
 		pt3_i2c_start(pt3);
 		pt3_i2c_cmd_write(pt3, &byte, 1);
 		if (msg[i].flags == I2C_M_RD)
@@ -178,6 +179,7 @@ static const struct i2c_algorithm pt3_i2c_algo = {
 int pt3_i2c_add_adapter(struct pt3_board *pt3)
 {
 	struct i2c_adapter *i2c = &pt3->i2c;
+
 	i2c->algo = &pt3_i2c_algo;
 	i2c->algo_data = NULL;
 	i2c->dev.parent = &pt3->pdev->dev;

@@ -68,6 +68,7 @@ int pt3_update_lnb(struct pt3_board *pt3)
 		pt3->lnb = 0;
 	} else {
 		struct pt3_adapter *adap;
+
 		for (i = 0; i < PT3_ADAPN; i++) {
 			adap = pt3->adap[i];
 			dev_dbg(adap->dvb.device, "#%d sleep %d\n", adap->idx, adap->sleep);
@@ -110,6 +111,7 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 {
 	int ret = 0;
 	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
+
 	dev_dbg(adap->dvb.device, "#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
 	if (!adap->users++) {
 		dev_dbg(adap->dvb.device, "#%d %s selected, DMA %s\n",
@@ -136,6 +138,7 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 int pt3_stop_feed(struct dvb_demux_feed *feed)
 {
 	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
+
 	dev_dbg(adap->dvb.device, "#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
 	if (!--adap->users) {
 		mutex_lock(&adap->lock);
@@ -161,9 +164,9 @@ struct pt3_adapter *pt3_dvb_register_adapter(struct pt3_board *pt3)
 	struct dvb_demux *demux;
 	struct dmxdev *dmxdev;
 	struct pt3_adapter *adap = kzalloc(sizeof(struct pt3_adapter), GFP_KERNEL);
+
 	if (!adap)
 		return ERR_PTR(-ENOMEM);
-
 	adap->pt3 = pt3;
 	adap->sleep = true;
 
@@ -200,6 +203,7 @@ struct pt3_adapter *pt3_dvb_register_adapter(struct pt3_board *pt3)
 int pt3_sleep(struct dvb_frontend *fe)
 {
 	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
+
 	dev_dbg(adap->dvb.device, "#%d %s orig %p\n", adap->idx, __func__, adap->orig_sleep);
 	adap->sleep = true;
 	pt3_update_lnb(adap->pt3);
@@ -209,6 +213,7 @@ int pt3_sleep(struct dvb_frontend *fe)
 int pt3_wakeup(struct dvb_frontend *fe)
 {
 	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
+
 	dev_dbg(adap->dvb.device, "#%d %s orig %p\n", adap->idx, __func__, adap->orig_init);
 	adap->sleep = false;
 	pt3_update_lnb(adap->pt3);
@@ -218,6 +223,7 @@ int pt3_wakeup(struct dvb_frontend *fe)
 int pt3_set_voltage(struct dvb_frontend *fe, fe_sec_voltage_t voltage)
 {
 	struct pt3_adapter *adap = container_of(fe->dvb, struct pt3_adapter, dvb);
+
 	adap->voltage = voltage == SEC_VOLTAGE_18 ? 2 : voltage == SEC_VOLTAGE_13 ? 1 : 0;
 	return (adap->orig_voltage) ? adap->orig_voltage(fe, voltage) : 0;
 }
@@ -311,7 +317,7 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pt3 = kzalloc(sizeof(struct pt3_board), GFP_KERNEL);
 	if (!pt3)
 		return pt3_abort(pdev, -ENOMEM, "struct pt3_board out of memory\n");
-	pt3->adap = kzalloc(PT3_ADAPN * sizeof(struct pt3_adapter *), GFP_KERNEL);
+	pt3->adap = kcalloc(PT3_ADAPN, sizeof(struct pt3_adapter *), GFP_KERNEL);
 	if (!pt3->adap)
 		return pt3_abort(pdev, -ENOMEM, "No memory for *adap\n");
 
@@ -360,8 +366,8 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	for (i = 0; i < PT3_ADAPN; i++) {
 		struct pt3_adapter *adap = pt3->adap[i];
-		dev_dbg(&pdev->dev, "#%d %s\n", i, __func__);
 
+		dev_dbg(&pdev->dev, "#%d %s\n", i, __func__);
 		adap->orig_voltage	= fe[i]->ops.set_voltage;
 		adap->orig_sleep	= fe[i]->ops.sleep;
 		adap->orig_init		= fe[i]->ops.init;

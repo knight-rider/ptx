@@ -24,6 +24,7 @@ struct qm1d1c0042 {
 	struct dvb_frontend *fe;
 	u8 addr_tuner, idx, reg[32];
 	u32 freq;
+	int (*read)(struct dvb_frontend *fe, u8 *buf, int buflen);
 };
 
 static const u8 qm1d1c0042_reg_rw[] = {
@@ -34,12 +35,15 @@ static const u8 qm1d1c0042_reg_rw[] = {
 };
 
 /* read via demodulator */
-int qm1d1c0042_fe_read(struct dvb_frontend *fe, u8 addr, u8 *data)
+int qm1d1c0042_fe_read(struct dvb_frontend *fe, u8 addr_data, u8 *data)
 {
 	int ret;
-	if ((addr != 0x00) && (addr != 0x0d))
+	struct qm1d1c0042 *qm = fe->tuner_priv;
+	u8 addr[] = { qm->addr_tuner, addr_data };
+
+	if ((addr_data != 0x00) && (addr_data != 0x0d))
 		return -EFAULT;
-	ret = fe->ops.write(fe, NULL, (((struct qm1d1c0042 *)fe->tuner_priv)->addr_tuner << 8) | addr);
+	ret = qm->read(fe, addr, ARRAY_SIZE(addr));
 	if (ret < 0)
 		return ret;
 	*data = ret;
@@ -73,6 +77,7 @@ int qm1d1c0042_write(struct dvb_frontend *fe, u8 addr, u8 data)
 	struct qm1d1c0042 *qm = fe->tuner_priv;
 	u8 buf[] = { addr, data };
 	int err = qm1d1c0042_fe_write_tuner(fe, buf, sizeof(buf));
+
 	qm->reg[addr] = buf[1];
 	return err;
 }
@@ -85,6 +90,7 @@ static const u8 qm1d1c0042_flag[32] = {
 int qm1d1c0042_write_pskmsrst(struct dvb_frontend *fe)
 {
 	u8 data = 0x01;
+
 	return qm1d1c0042_fe_write_data(fe, 0x03, &data, 1);
 }
 
@@ -96,25 +102,25 @@ enum qm1d1c0042_agc {
 int qm1d1c0042_set_agc(struct dvb_frontend *fe, enum qm1d1c0042_agc agc)
 {
 	u8 data = (agc == QM1D1C0042_AGC_AUTO) ? 0xff : 0x00;
-	int ret = qm1d1c0042_fe_write_data(fe, 0x0a, &data, 1);
-	if (ret)
-		return ret;
+	int err = qm1d1c0042_fe_write_data(fe, 0x0a, &data, 1);
 
+	if (err)
+		return err;
 	data = 0xb0 | ((agc == QM1D1C0042_AGC_AUTO) ? 1 : 0);
-	ret = qm1d1c0042_fe_write_data(fe, 0x10, &data, 1);
-	if (ret)
-		return ret;
+	err = qm1d1c0042_fe_write_data(fe, 0x10, &data, 1);
+	if (err)
+		return err;
 
 	data = (agc == QM1D1C0042_AGC_AUTO) ? 0x40 : 0x00;
-	return (ret = qm1d1c0042_fe_write_data(fe, 0x11, &data, 1)) ? ret : qm1d1c0042_write_pskmsrst(fe);
+	return (err = qm1d1c0042_fe_write_data(fe, 0x11, &data, 1)) ? err : qm1d1c0042_write_pskmsrst(fe);
 }
 
 int qm1d1c0042_sleep(struct dvb_frontend *fe)
 {
 	struct qm1d1c0042 *qm = fe->tuner_priv;
 	u8 buf = 1;
-	dev_dbg(fe->dvb->device, "#%d %s\n", qm->idx, __func__);
 
+	dev_dbg(fe->dvb->device, "#%d %s\n", qm->idx, __func__);
 	qm->reg[0x01] &= (~(1 << 3)) & 0xff;
 	qm->reg[0x01] |= 1 << 0;
 	qm->reg[0x05] |= 1 << 3;
@@ -128,8 +134,8 @@ int qm1d1c0042_wakeup(struct dvb_frontend *fe)
 {
 	struct qm1d1c0042 *qm = fe->tuner_priv;
 	u8 buf = 0;
-	dev_dbg(fe->dvb->device, "#%d %s\n", qm->idx, __func__);
 
+	dev_dbg(fe->dvb->device, "#%d %s\n", qm->idx, __func__);
 	qm->reg[0x01] |= 1 << 3;
 	qm->reg[0x01] &= (~(1 << 0)) & 0xff;
 	qm->reg[0x05] &= (~(1 << 3)) & 0xff;
@@ -236,31 +242,31 @@ static int qm1d1c0042_local_lpf_tuning(struct qm1d1c0042 *qm, u32 channel)
 	struct dvb_frontend *fe = qm->fe;
 	u8 i_data;
 	u32 sd = 0;
-	int ret = qm1d1c0042_tuning(qm, &sd, channel);
-	if (ret)
-		return ret;
+	int err = qm1d1c0042_tuning(qm, &sd, channel);
 
+	if (err)
+		return err;
 	i_data = qm->reg[0x08] & 0xf0;
 	i_data |= 2;
-	ret = qm1d1c0042_write(fe, 0x08, i_data);
-	if (ret)
-		return ret;
+	err = qm1d1c0042_write(fe, 0x08, i_data);
+	if (err)
+		return err;
 
 	qm->reg[0x09] &= 0xc0;
 	qm->reg[0x09] |= (sd >> 16) & 0x3f;
 	qm->reg[0x0a] = (sd >> 8) & 0xff;
 	qm->reg[0x0b] = (sd >> 0) & 0xff;
-	ret =	qm1d1c0042_write(fe, 0x09, qm->reg[0x09])	||
+	err =	qm1d1c0042_write(fe, 0x09, qm->reg[0x09])	||
 		qm1d1c0042_write(fe, 0x0a, qm->reg[0x0a])	||
 		qm1d1c0042_write(qm->fe, 0x0b, qm->reg[0x0b]);
-	if (ret)
-		return ret;
+	if (err)
+		return err;
 
 	i_data = qm->reg[0x0c];
 	i_data &= 0x3f;
-	ret = qm1d1c0042_write(fe, 0x0c, i_data);
-	if (ret)
-		return ret;
+	err = qm1d1c0042_write(fe, 0x0c, i_data);
+	if (err)
+		return err;
 	msleep_interruptible(1);
 
 	i_data = qm->reg[0x0c];
@@ -272,14 +278,15 @@ static int qm1d1c0042_local_lpf_tuning(struct qm1d1c0042 *qm, u32 channel)
 
 int qm1d1c0042_get_locked(struct qm1d1c0042 *qm, bool *locked)
 {
-	int ret = qm1d1c0042_fe_read(qm->fe, 0x0d, &qm->reg[0x0d]);
-	if (ret)
-		return ret;
+	int err = qm1d1c0042_fe_read(qm->fe, 0x0d, &qm->reg[0x0d]);
+
+	if (err)
+		return err;
 	if (qm->reg[0x0d] & 0x40)
 		*locked = true;
 	else
 		*locked = false;
-	return ret;
+	return err;
 }
 
 u32 qm1d1c0042_freq2ch(u32 frequency)
@@ -294,10 +301,9 @@ u32 qm1d1c0042_freq2ch(u32 frequency)
 		return frequency;	/* consider as channel ID if low */
 	if (diff2 < min)
 		return ch2 + 24;
-	else if (min == diff1)
+	if (min == diff1)
 		return ch1 + 12;
-	else
-		return ch0;
+	return ch0;
 }
 
 int qm1d1c0042_set_freq(struct dvb_frontend *fe, u32 frequency)
@@ -308,9 +314,9 @@ int qm1d1c0042_set_freq(struct dvb_frontend *fe, u32 frequency)
 	bool locked = false;
 	unsigned long timeout;
 	int err = qm1d1c0042_set_agc(fe, QM1D1C0042_AGC_MANUAL);
+
 	if (err)
 		return err;
-
 	qm1d1c0042_get_channel_freq(channel, &number, &freq);
 	qm->freq = freq * 10 - 500;
 	dev_dbg(fe->dvb->device, "#%d ch %d freq %d kHz\n", qm->idx, channel, qm->freq);
@@ -355,12 +361,14 @@ int qm1d1c0042_attach(struct dvb_frontend *fe, u8 addr_tuner)
 {
 	u8 d[] = { 0x10, 0x15, 0x04 };
 	struct qm1d1c0042 *qm = kzalloc(sizeof(struct qm1d1c0042), GFP_KERNEL);
+
 	if (!qm)
 		return -ENOMEM;
 	fe->tuner_priv = qm;
 	qm->fe = fe;
 	qm->addr_tuner = addr_tuner;
 	qm->idx = !(addr_tuner & 1);
+	qm->read = fe->ops.tuner_ops.calc_regs;
 	memcpy(&fe->ops.tuner_ops, &qm1d1c0042_ops, sizeof(struct dvb_tuner_ops));
 
 	memcpy(qm->reg, qm1d1c0042_reg_rw, sizeof(qm1d1c0042_reg_rw));

@@ -24,6 +24,7 @@ struct mxl301rf {
 	struct dvb_frontend *fe;
 	u8 addr_tuner, idx;
 	u32 freq;
+	int (*read)(struct dvb_frontend *fe, u8 *buf, int buflen);
 };
 
 struct shf_dvbt {
@@ -109,7 +110,6 @@ int mxl301rf_freq(int freq)
 
 void mxl301rf_rftune(struct dvb_frontend *fe, u8 *data, u32 *size, u32 freq)
 {
-	u32 dig_rf_freq, tmp, frac_divider, kHz, MHz, i;
 	u8 rf_data[] = {
 		0x13, 0x00,	/* abort tune			*/
 		0x3b, 0xc0,
@@ -122,17 +122,14 @@ void mxl301rf_rftune(struct dvb_frontend *fe, u8 *data, u32 *size, u32 freq)
 		0x12, 0x0e,	/* 2 bytes to store RF freq.	*/
 		0x13, 0x01	/* start tune			*/
 	};
+	u32 i, dig_rf_freq, tmp,
+		kHz = 1000,
+		MHz = 1000000,
+		frac_divider = 1000000;
 
 	freq = mxl301rf_freq(freq);
-	dig_rf_freq = 0;
-	tmp = 0;
-	frac_divider = 1000000;
-	kHz = 1000;
-	MHz = 1000000;
-
 	dig_rf_freq = freq / MHz;
 	tmp = freq % MHz;
-
 	for (i = 0; i < 6; i++) {
 		dig_rf_freq <<= 1;
 		frac_divider /= 2;
@@ -143,7 +140,6 @@ void mxl301rf_rftune(struct dvb_frontend *fe, u8 *data, u32 *size, u32 freq)
 	}
 	if (tmp > 7812)
 		dig_rf_freq++;
-
 	rf_data[2 * 7 + 1] = (u8)(dig_rf_freq);
 	rf_data[2 * 8 + 1] = (u8)(dig_rf_freq >> 8);
 
@@ -186,11 +182,12 @@ int mxl301rf_fe_write_tuner(struct dvb_frontend *fe, const u8 *data, int len)
 /* read via demodulator */
 void mxl301rf_fe_read(struct dvb_frontend *fe, u8 addr, u8 *data)
 {
+	struct mxl301rf *mx = fe->tuner_priv;
 	const u8 wbuf[2] = {0xfb, addr};
 	int ret;
 
 	mxl301rf_fe_write_tuner(fe, wbuf, sizeof(wbuf));
-	ret = fe->ops.write(fe, NULL, (1 << 16) | (((struct mxl301rf *)fe->tuner_priv)->addr_tuner << 8) | addr);
+	ret = mx->read(fe, &mx->addr_tuner, 1);
 	if (ret >= 0)
 		*data = ret;
 }
@@ -213,12 +210,14 @@ void mxl301rf_idac_setting(struct dvb_frontend *fe)
 void mxl301rf_set_register(struct dvb_frontend *fe, u8 addr, u8 value)
 {
 	const u8 data[2] = {addr, value};
+
 	mxl301rf_fe_write_tuner(fe, data, sizeof(data));
 }
 
 int mxl301rf_write_imsrst(struct dvb_frontend *fe)
 {
 	u8 data = 0x01 << 6;
+
 	return mxl301rf_fe_write_data(fe, 0x01, &data, 1);
 }
 
@@ -230,10 +229,10 @@ enum mxl301rf_agc {
 int mxl301rf_set_agc(struct dvb_frontend *fe, enum mxl301rf_agc agc)
 {
 	u8 data = (agc == MXL301RF_AGC_AUTO) ? 0x40 : 0x00;
-	int ret = mxl301rf_fe_write_data(fe, 0x25, &data, 1);
-	if (ret)
-		return ret;
+	int err = mxl301rf_fe_write_data(fe, 0x25, &data, 1);
 
+	if (err)
+		return err;
 	data = 0x4c | ((agc == MXL301RF_AGC_AUTO) ? 0x00 : 0x01);
 	return	mxl301rf_fe_write_data(fe, 0x23, &data, 1) ||
 		mxl301rf_write_imsrst(fe);
@@ -244,6 +243,7 @@ int mxl301rf_sleep(struct dvb_frontend *fe)
 	u8 buf = (1 << 7) | (1 << 4);
 	const u8 data[4] = {0x01, 0x00, 0x13, 0x00};
 	int err = mxl301rf_set_agc(fe, MXL301RF_AGC_MANUAL);
+
 	if (err)
 		return err;
 	mxl301rf_fe_write_tuner(fe, data, sizeof(data));
@@ -288,9 +288,9 @@ int mxl301rf_tuner_rftune(struct dvb_frontend *fe, u32 freq)
 	u8 data[100];
 	u32 size = 0;
 	int err = mxl301rf_set_agc(fe, MXL301RF_AGC_MANUAL);
+
 	if (err)
 		return err;
-
 	mx->freq = freq;
 	mxl301rf_rftune(fe, data, &size, freq);
 	if (size != 20) {
@@ -303,7 +303,6 @@ int mxl301rf_tuner_rftune(struct dvb_frontend *fe, u32 freq)
 	msleep_interruptible(1);
 	mxl301rf_set_register(fe, 0x1a, 0x0d);
 	mxl301rf_idac_setting(fe);
-
 	return mxl301rf_locked(fe) ? 0 : -ETIMEDOUT;
 }
 
@@ -345,12 +344,14 @@ int mxl301rf_attach(struct dvb_frontend *fe, u8 addr_tuner)
 {
 	u8 d[] = { 0x10, 0x01 };
 	struct mxl301rf *mx = kzalloc(sizeof(struct mxl301rf), GFP_KERNEL);
+
 	if (!mx)
 		return -ENOMEM;
 	fe->tuner_priv = mx;
 	mx->fe = fe;
 	mx->idx = (addr_tuner & 1) | 2;
 	mx->addr_tuner = addr_tuner;
+	mx->read = fe->ops.tuner_ops.calc_regs;
 	memcpy(&fe->ops.tuner_ops, &mxl301rf_ops, sizeof(struct dvb_tuner_ops));
 
 	return	mxl301rf_fe_write_data(fe, 0x1c, d, 1)	||

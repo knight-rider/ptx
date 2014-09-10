@@ -40,46 +40,22 @@ struct tc90522 {
 	enum tc90522_state state;
 };
 
-int tc90522_read_tuner_wo_addr(struct tc90522 *demod, u8 addr_tuner)
-{
-	u8 buf[] = { TC90522_PASSTHROUGH, (addr_tuner << 1) | 1, 0 };
-	struct i2c_msg msg[] = {
-		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf,	.len = 2, },
-		{ .addr = demod->addr_demod, .flags = I2C_M_RD,	.buf = buf + 2,	.len = 1, },
-	};
-	return i2c_transfer(demod->i2c, msg, 2) == 2 ? buf[2] : -EREMOTEIO;
-}
-
-int tc90522_read_tuner(struct tc90522 *demod, int addrs)
-{
-	u8 addr_tuner = (addrs >> 8) & 0xff,
-	   addr_data = addrs & 0xff;
-	u8 buf[] = { TC90522_PASSTHROUGH, addr_tuner << 1, addr_data, TC90522_PASSTHROUGH, (addr_tuner << 1) | 1, 0 };
-	struct i2c_msg msg[] = {
-		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf,	.len = 3, },
-		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf + 3,	.len = 2, },
-		{ .addr = demod->addr_demod, .flags = I2C_M_RD,	.buf = buf + 5,	.len = 1, },
-	};
-
-	if (addrs >> 16)
-		return tc90522_read_tuner_wo_addr(demod, addr_tuner);
-	return i2c_transfer(demod->i2c, msg, 3) == 3 ? buf[5] : -EREMOTEIO;
-}
-
 int tc90522_write(struct dvb_frontend *fe, const u8 *data, int len)
 {
 	struct tc90522 *demod = fe->demodulator_priv;
 	struct i2c_msg msg[] = {
 		{ .addr = demod->addr_demod, .flags = 0, .buf = (u8 *)data, .len = len, },
 	};
-	if (!data)
-		return tc90522_read_tuner(demod, len);
+
+	if (!data || !len)
+		return -EINVAL;
 	return i2c_transfer(demod->i2c, msg, 1) == 1 ? 0 : -EREMOTEIO;
 }
 
 int tc90522_write_data(struct dvb_frontend *fe, u8 addr_data, u8 *data, u8 len)
 {
 	u8 buf[len + 1];
+
 	buf[0] = addr_data;
 	memcpy(buf + 1, data, len);
 	return tc90522_write(fe, buf, len + 1);
@@ -112,6 +88,7 @@ int tc90522_read_id_s(struct tc90522 *demod, u16 *id)
 {
 	u8 buf[2];
 	int err = tc90522_read(demod, 0xe6, buf, 2);
+
 	if (!err)
 		*id = tc90522_n2int(buf, 2);
 	return err;
@@ -160,6 +137,7 @@ enum tc90522_pwr {
 int tc90522_set_powers(struct tc90522 *demod, enum tc90522_pwr pwr)
 {
 	u8 data = pwr | 0b10011001;
+
 	dev_dbg(&demod->i2c->dev, "%s #%d %s tuner %s amp %s\n", demod->i2c->name, demod->idx, __func__, pwr & TC90522_PWR_TUNER_ON ?
 		"ON" : "OFF", pwr & TC90522_PWR_AMP_ON ? "ON" : "OFF");
 	return tc90522_write_data(&demod->fe, 0x1e, &data, 1);
@@ -174,6 +152,7 @@ int tc90522_get_frontend_algo(struct dvb_frontend *fe)
 int tc90522_sleep(struct dvb_frontend *fe)
 {
 	struct tc90522 *demod = fe->demodulator_priv;
+
 	dev_dbg(&demod->i2c->dev, "%s #%d %s %s\n", demod->i2c->name, demod->idx, __func__, demod->type == SYS_ISDBS ? "S" : "T");
 	return fe->ops.tuner_ops.sleep(fe);
 }
@@ -181,6 +160,7 @@ int tc90522_sleep(struct dvb_frontend *fe)
 int tc90522_wakeup(struct dvb_frontend *fe)
 {
 	struct tc90522 *demod = fe->demodulator_priv;
+
 	dev_dbg(&demod->i2c->dev, "%s #%d %s %s\n", demod->i2c->name, demod->idx, __func__, demod->type == SYS_ISDBS ? "S" : "T");
 	demod->state = TC90522_IDLE;
 	return fe->ops.tuner_ops.init(fe);
@@ -189,8 +169,8 @@ int tc90522_wakeup(struct dvb_frontend *fe)
 void tc90522_release(struct dvb_frontend *fe)
 {
 	struct tc90522 *demod = fe->demodulator_priv;
-	dev_dbg(&demod->i2c->dev, "%s #%d %s\n", demod->i2c->name, demod->idx, __func__);
 
+	dev_dbg(&demod->i2c->dev, "%s #%d %s\n", demod->i2c->name, demod->idx, __func__);
 	tc90522_set_powers(demod, TC90522_PWR_OFF);
 	tc90522_sleep(fe);
 	fe->ops.tuner_ops.release(fe);
@@ -201,6 +181,7 @@ s64 tc90522_get_cn_raw(struct tc90522 *demod)
 {
 	u8 buf[3], buflen = demod->type == SYS_ISDBS ? 2 : 3, addr = demod->type == SYS_ISDBS ? 0xbc : 0x8b;
 	int err = tc90522_read(demod, addr, buf, buflen);
+
 	return err < 0 ? err : tc90522_n2int(buf, buflen);
 }
 
@@ -223,6 +204,7 @@ s64 tc90522_get_cn_s(s64 raw)	/* @ .0001 dB */
 s64 tc90522_get_cn_t(s64 raw)	/* @ .0001 dB */
 {
 	s64 x, y;
+
 	if (!raw)
 		return 0;
 	x = (1130911733ll - 10ll * intlog10(raw)) >> 2;
@@ -345,6 +327,7 @@ int tc90522_tune_s(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 		}
 		for (i = 0; i < 1000; i++) {
 			u16 short_id;
+
 			err = tc90522_read_id_s(demod, &short_id);
 			if (err) {
 				dev_dbg(&demod->i2c->dev, "%s fail get_id_s err=%d\n", demod->i2c->name, err);
@@ -372,6 +355,21 @@ int tc90522_tune_s(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 	return -ERANGE;
 }
 
+int tc90522_read_tuner_s(struct dvb_frontend *fe, u8 *addr, int len)
+{
+	struct tc90522 *demod = fe->demodulator_priv;
+	u8 buf[] = { TC90522_PASSTHROUGH, addr[0] << 1, addr[1], TC90522_PASSTHROUGH, (addr[0] << 1) | 1, 0 };
+	struct i2c_msg msg[] = {
+		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf,	.len = 3, },
+		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf + 3,	.len = 2, },
+		{ .addr = demod->addr_demod, .flags = I2C_M_RD,	.buf = buf + 5,	.len = 1, },
+	};
+
+	if (!addr || (len != 2))
+		return -EINVAL;
+	return i2c_transfer(demod->i2c, msg, 3) == 3 ? buf[5] : -EREMOTEIO;
+}
+
 static struct dvb_frontend_ops tc90522_ops_s = {
 	.delsys = { SYS_ISDBS },
 	.info = {
@@ -387,6 +385,7 @@ static struct dvb_frontend_ops tc90522_ops_s = {
 	.read_snr = tc90522_read_snr,
 	.read_status = tc90522_read_status,
 	.tune = tc90522_tune_s,
+	.tuner_ops.calc_regs = tc90522_read_tuner_s,
 };
 
 /**** ISDB-T ****/
@@ -404,10 +403,9 @@ int tc90522_get_tmcc_t(struct tc90522 *demod)
 		if (!fulock) {
 			b = true;
 			break;
-		} else {
-			if (retryov)
-				break;
 		}
+		if (retryov)
+			break;
 		msleep_interruptible(1);
 	}
 	return b ? 0 : -EBADMSG;
@@ -467,6 +465,20 @@ int tc90522_tune_t(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 	return -ERANGE;
 }
 
+int tc90522_read_tuner_t(struct dvb_frontend *fe, u8 *addr, int len)
+{
+	struct tc90522 *demod = fe->demodulator_priv;
+	u8 buf[] = { TC90522_PASSTHROUGH, (addr[0] << 1) | 1, 0 };
+	struct i2c_msg msg[] = {
+		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf,	.len = 2, },
+		{ .addr = demod->addr_demod, .flags = I2C_M_RD,	.buf = buf + 2,	.len = 1, },
+	};
+
+	if (!addr || (len != 1))
+		return -EINVAL;
+	return i2c_transfer(demod->i2c, msg, 2) == 2 ? buf[2] : -EREMOTEIO;
+}
+
 static struct dvb_frontend_ops tc90522_ops_t = {
 	.delsys = { SYS_ISDBT },
 	.info = {
@@ -482,6 +494,7 @@ static struct dvb_frontend_ops tc90522_ops_t = {
 	.read_snr = tc90522_read_snr,
 	.read_status = tc90522_read_status,
 	.tune = tc90522_tune_t,
+	.tuner_ops.calc_regs = tc90522_read_tuner_t,
 };
 
 /**** Common ****/
@@ -489,9 +502,9 @@ struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_
 {
 	struct dvb_frontend *fe;
 	struct tc90522 *demod = kzalloc(sizeof(struct tc90522), GFP_KERNEL);
+
 	if (!demod)
 		return NULL;
-
 	demod->addr_demod = addr_demod;
 	demod->idx	= (!(addr_demod & 1) << 1) + ((addr_demod & 2) >> 1);
 	demod->i2c	= i2c;
