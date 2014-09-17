@@ -40,6 +40,20 @@ struct tc90522 {
 	enum tc90522_state state;
 };
 
+/*
+I2C Sequences (ref: pt3_i2c.c):
+
+START	= I_DATA_H, I_CLOCK_H, I_DATA_L, I_CLOCK_L
+STOP	= I_DATA_L, I_CLOCK_H, I_DATA_H
+
+Write			START, addr_demod, addr_data, data*size, STOP
+WriteTuner		START, addr_demod, 0xfe, addr_tuner, addr_data, data*size, STOP
+WriteTunerNoDataAddr	START, addr_demod, 0xfe, addr_tuner, data*size, STOP
+Read			START, addr_demod, addr, START, addr_demod|1, [READ*8, LNOP or HNOP]*size, STOP
+ReadTuner		START, addr_demod, 0xfe, addr_data, START, addr_demod, 0xfe, addr_tuner|1, START, addr_demod|1, [READ*8, LNOP or HNOP]*size, STOP
+ReadTunerNoDataAddr	START, addr_demod, 0xfe, addr_tuner|1, START, addr_demod|1, [READ*8, LNOP or HNOP]*size, STOP
+*/
+
 int tc90522_write(struct dvb_frontend *fe, const u8 *data, int len)
 {
 	struct tc90522 *demod = fe->demodulator_priv;
