@@ -28,3 +28,7 @@ Full package:
 	$ chmod +x dkms.install dkms.uninstall
 	$ ./dkms.install
 
+・「adapter0とadapter2を両方使ってる時にadapter0のdemux0をclose()するとadapter2側でドロップ」は
+　こちらでは発生していないので、助言等含めて詳しく教えて欲しいです。
+・複数枚同時実装は未検証です。何方か環境をご提供頂くか、実験をして頂ければ幸いです。
+

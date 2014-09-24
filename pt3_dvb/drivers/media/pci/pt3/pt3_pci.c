@@ -150,7 +150,6 @@ int pt3_stop_feed(struct dvb_demux_feed *feed)
 			adap->kthread = NULL;
 		}
 		mutex_unlock(&adap->lock);
-		msleep_interruptible(40);
 	}
 	return 0;
 }
@@ -307,13 +306,10 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		pci_request_selected_regions(pdev, bars, DRV_NAME);
 	if (err)
 		return pt3_abort(pdev, err, "PCI/DMA error\n");
-	if ((i & 0xFF) != 1)
-		return pt3_abort(pdev, -EINVAL, "Revision 0x%x is not supported\n", i & 0xFF);
+	if ((i &= 0xff) != 1)
+		return pt3_abort(pdev, -EINVAL, "Revision 0x%x is not supported\n", i);
 
 	pci_set_master(pdev);
-	err = pci_save_state(pdev);
-	if (err)
-		return pt3_abort(pdev, err, "Failed pci_save_state\n");
 	pt3 = kzalloc(sizeof(struct pt3_board), GFP_KERNEL);
 	if (!pt3)
 		return pt3_abort(pdev, -ENOMEM, "struct pt3_board out of memory\n");
