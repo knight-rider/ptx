@@ -18,7 +18,7 @@
 #include "tc90522.h"
 
 MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
-MODULE_DESCRIPTION("Toshiba TC90522 OFDM(ISDB-T)/8PSK(ISDB-S) demodulator [Earthsoft PT3]");
+MODULE_DESCRIPTION("Toshiba TC90522 8PSK(ISDB-S)/OFDM(ISDB-T) PT3 quad demodulator");
 MODULE_LICENSE("GPL");
 
 #define TC90522_PASSTHROUGH 0xfe
@@ -222,7 +222,7 @@ s64 tc90522_get_cn_t(s64 raw)	/* @ .0001 dB */
 	if (!raw)
 		return 0;
 	x = (1130911733ll - 10ll * intlog10(raw)) >> 2;
-	y = (6ll * x / 25ll) - (16ll << 22);
+	y = (x >> 2) - (x >> 6) + (x >> 8) + (x >> 9) - (x >> 10) + (x >> 11) + (x >> 12) - (16ll << 22);
 	y = ((x * y) >> 22) + (398ll << 22);
 	y = ((x * y) >> 22) + (5491ll << 22);
 	y = ((x * y) >> 22) + (30965ll << 22);

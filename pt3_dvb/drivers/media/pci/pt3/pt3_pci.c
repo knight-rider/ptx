@@ -109,7 +109,7 @@ int pt3_thread(void *data)
 
 int pt3_start_feed(struct dvb_demux_feed *feed)
 {
-	int ret = 0;
+	int err = 0;
 	struct pt3_adapter *adap = container_of(feed->demux, struct pt3_adapter, demux);
 
 	dev_dbg(adap->dvb.device, "#%d %s sleep %d\n", adap->idx, __func__, adap->sleep);
@@ -121,7 +121,7 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 		if (!adap->kthread) {
 			adap->kthread = kthread_run(pt3_thread, adap, DRV_NAME "_%d", adap->idx);
 			if (IS_ERR(adap->kthread)) {
-				ret = PTR_ERR(adap->kthread);
+				err = PTR_ERR(adap->kthread);
 				adap->kthread = NULL;
 			} else {
 				pt3_dma_set_test_mode(adap->dma, RESET, 0);	/* reset error count */
@@ -129,8 +129,8 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 			}
 		}
 		mutex_unlock(&adap->lock);
-		if (ret)
-			return ret;
+		if (err)
+			return err;
 	}
 	return 0;
 }
@@ -272,7 +272,7 @@ void pt3_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 }
 
-int pt3_abort(struct pci_dev *pdev, int ret, char *fmt, ...)
+int pt3_abort(struct pci_dev *pdev, int err, char *fmt, ...)
 {
 	va_list ap;
 	char *s = NULL;
@@ -288,7 +288,7 @@ int pt3_abort(struct pci_dev *pdev, int ret, char *fmt, ...)
 	}
 	va_end(ap);
 	pt3_remove(pdev);
-	return ret;
+	return err;
 }
 
 int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
@@ -297,16 +297,17 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct pt3_adapter *adap;
 	const struct pt3_cfg *cfg = pt3_cfg;
 	struct dvb_frontend *fe[PT3_ADAPN];
-	int i, err, bars = pci_select_bars(pdev, IORESOURCE_MEM);
+	u8 i;
+	int err, bars = pci_select_bars(pdev, IORESOURCE_MEM);
 
 	err = pci_enable_device(pdev)					||
 		pci_set_dma_mask(pdev, DMA_BIT_MASK(64))		||
 		pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64))	||
-		pci_read_config_dword(pdev, PCI_CLASS_REVISION, &i)	||
+		pci_read_config_byte(pdev, PCI_CLASS_REVISION, &i)	||
 		pci_request_selected_regions(pdev, bars, DRV_NAME);
 	if (err)
 		return pt3_abort(pdev, err, "PCI/DMA error\n");
-	if ((i &= 0xff) != 1)
+	if (i != 1)
 		return pt3_abort(pdev, -EINVAL, "Revision 0x%x is not supported\n", i);
 
 	pci_set_master(pdev);

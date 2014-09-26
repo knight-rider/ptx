@@ -1,7 +1,10 @@
 DVB driver for Earthsoft PT3 (PCIE ISDB-S/T receiver)
 =====================================================
 
-Status: STABLE
+Changes:
+- 32bit + 64bit clean compile (removed math64.h)
+- simpler & yet precise CNR calculation
+- CNR @ 0.0001 dB (as stated in include/uapi/linux/dvb/frontend.h, not 1/1000 dB!)
 
 Features:
 - tuning enhancements (compared to PT1 DVB)
