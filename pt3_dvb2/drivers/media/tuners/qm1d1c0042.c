@@ -78,11 +78,6 @@ int qm1d1c0042_write(struct dvb_frontend *fe, u8 addr, u8 data)
 	return err;
 }
 
-static const u8 qm1d1c0042_flag[32] = {
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0,
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-};
-
 int qm1d1c0042_write_pskmsrst(struct dvb_frontend *fe)
 {
 	u8 data = 0x01;
