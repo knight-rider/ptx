@@ -1,0 +1,11 @@
+config PT3_DVB
+	tristate "Earthsoft PT3 ISDB-S/T cards"
+	depends on DVB_CORE && PCI
+	select DVB_TC90522 if MEDIA_SUBDRV_AUTOSELECT
+	select MEDIA_TUNER_QM1D1C0042 if MEDIA_SUBDRV_AUTOSELECT
+	select MEDIA_TUNER_MXL301RF if MEDIA_SUBDRV_AUTOSELECT
+	help
+	  Support for Earthsoft PT3 PCI-Express cards.
+	  You need to enable frontend (TC90522) & tuners (QM1D1C0042, MXL301RF)
+	  Say Y or M if you own such a device and want to use it.
+
