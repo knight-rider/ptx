@@ -119,7 +119,7 @@ int pt3_start_feed(struct dvb_demux_feed *feed)
 			pt3_dma_get_status(adap->dma) & 1 ? "ON" : "OFF");
 		mutex_lock(&adap->lock);
 		if (!adap->kthread) {
-			adap->kthread = kthread_run(pt3_thread, adap, DRV_NAME "_%d", adap->idx);
+			adap->kthread = kthread_run(pt3_thread, adap, PT3_DRVNAME "_%d", adap->idx);
 			if (IS_ERR(adap->kthread)) {
 				err = PTR_ERR(adap->kthread);
 				adap->kthread = NULL;
@@ -171,7 +171,7 @@ struct pt3_adapter *pt3_dvb_register_adapter(struct pt3_board *pt3)
 
 	dvb = &adap->dvb;
 	dvb->priv = adap;
-	ret = dvb_register_adapter(dvb, DRV_NAME, THIS_MODULE, &pt3->pdev->dev, adapter_nr);
+	ret = dvb_register_adapter(dvb, PT3_DRVNAME, THIS_MODULE, &pt3->pdev->dev, adapter_nr);
 	dev_dbg(dvb->device, "adapter%d registered\n", ret);
 	if (ret >= 0) {
 		demux = &adap->demux;
@@ -227,6 +227,14 @@ int pt3_set_voltage(struct dvb_frontend *fe, fe_sec_voltage_t voltage)
 	return (adap->orig_voltage) ? adap->orig_voltage(fe, voltage) : 0;
 }
 
+void pt3_unregister_subdev(struct i2c_client *clt)
+{
+	if (clt) {
+		module_put(clt->dev.driver->owner);
+		i2c_unregister_device(clt);
+	}
+}
+
 void pt3_cleanup_adapter(struct pt3_adapter *adap)
 {
 	if (!adap)
@@ -237,6 +245,8 @@ void pt3_cleanup_adapter(struct pt3_adapter *adap)
 		dvb_unregister_frontend(adap->fe);
 		adap->fe->ops.release(adap->fe);
 	}
+	pt3_unregister_subdev(adap->i2c_tuner);
+	pt3_unregister_subdev(adap->i2c_demod);
 	if (adap->dma) {
 		if (adap->dma->enabled)
 			pt3_dma_set_enabled(adap->dma, false);
@@ -291,6 +301,20 @@ int pt3_abort(struct pci_dev *pdev, int err, char *fmt, ...)
 	return err;
 }
 
+struct i2c_client *pt3_register_subdev(struct i2c_adapter *adap, struct i2c_board_info const *info)
+{
+	struct i2c_client *clt;
+
+	request_module("%s", info->type);
+	clt = i2c_new_device(adap, info);
+	if (clt && clt->dev.driver)
+		if (!try_module_get(clt->dev.driver->owner)) {
+			i2c_unregister_device(clt);
+			clt = NULL;
+		}
+	return clt;
+}
+
 int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct pt3_board *pt3;
@@ -304,7 +328,7 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		pci_set_dma_mask(pdev, DMA_BIT_MASK(64))		||
 		pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64))	||
 		pci_read_config_byte(pdev, PCI_CLASS_REVISION, &i)	||
-		pci_request_selected_regions(pdev, bars, DRV_NAME);
+		pci_request_selected_regions(pdev, bars, PT3_DRVNAME);
 	if (err)
 		return pt3_abort(pdev, err, "PCI/DMA error\n");
 	if (i != 1)
@@ -352,19 +376,31 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	for (i = 0; i < PT3_ADAPN; i++) {
-		fe[i] = tc90522_attach(&pt3->i2c, cfg[i].type, cfg[i].addr_demod, i + 1 == PT3_ADAPN);
-		if (!fe[i] || (cfg[i].type == SYS_ISDBS ?
-			qm1d1c0042_attach(fe[i], cfg[i].addr_tuner) : mxl301rf_attach(fe[i], cfg[i].addr_tuner))) {
-			while (i--)
-				fe[i]->ops.release(fe[i]);
-			return pt3_abort(pdev, -ENOMEM, "Cannot attach frontend\n");
-		}
+		struct tc90522_config cfg_demod = {};
+		struct i2c_board_info info = {};
+
+		adap = pt3->adap[i];
+		cfg_demod.type = cfg[i].type;
+		cfg_demod.pwr = i + 1 == PT3_ADAPN;
+		info.addr = cfg[i].addr_demod;
+		info.platform_data = &cfg_demod;
+		strlcpy(info.type, TC90522_DRVNAME, I2C_NAME_SIZE);
+		adap->i2c_demod = pt3_register_subdev(&pt3->i2c, &info);
+		if (!adap->i2c_demod)
+			return pt3_abort(pdev, -ENODEV, "Cannot register I2C demod\n");
+		fe[i] = cfg_demod.fe;
+
+		info.addr = cfg[i].addr_tuner;
+		info.platform_data = fe[i];
+		strlcpy(info.type, cfg[i].type == SYS_ISDBS ? QM1D1C0042_DRVNAME : MXL301RF_DRVNAME, I2C_NAME_SIZE);
+		adap->i2c_tuner = pt3_register_subdev(&pt3->i2c, &info);
+		if (!adap->i2c_tuner)
+			return pt3_abort(pdev, -ENODEV, "Cannot register I2C tuner\n");
 	}
 
 	for (i = 0; i < PT3_ADAPN; i++) {
-		struct pt3_adapter *adap = pt3->adap[i];
-
 		dev_dbg(&pdev->dev, "#%d %s\n", i, __func__);
+		adap = pt3->adap[i];
 		adap->orig_voltage	= fe[i]->ops.set_voltage;
 		adap->orig_sleep	= fe[i]->ops.sleep;
 		adap->orig_init		= fe[i]->ops.init;
@@ -390,11 +426,10 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 }
 
 static struct pci_driver pt3_driver = {
-	.name		= DRV_NAME,
+	.name		= PT3_DRVNAME,
 	.probe		= pt3_probe,
 	.remove		= pt3_remove,
 	.id_table	= pt3_id_table,
 };
-
 module_pci_driver(pt3_driver);
 

@@ -17,10 +17,6 @@
 #include "dvb_math.h"
 #include "tc90522.h"
 
-MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
-MODULE_DESCRIPTION("Toshiba TC90522 8PSK(ISDB-S)/OFDM(ISDB-T) PT3 quad demodulator");
-MODULE_LICENSE("GPL");
-
 #define TC90522_PASSTHROUGH 0xfe
 
 enum tc90522_state {
@@ -39,20 +35,6 @@ struct tc90522 {
 	s32 offset;
 	enum tc90522_state state;
 };
-
-/*
-I2C Sequences (ref: pt3_i2c.c):
-
-START	= I_DATA_H, I_CLOCK_H, I_DATA_L, I_CLOCK_L
-STOP	= I_DATA_L, I_CLOCK_H, I_DATA_H
-
-Write			START, addr_demod, addr_data, data*size, STOP
-WriteTuner		START, addr_demod, 0xfe, addr_tuner, addr_data, data*size, STOP
-WriteTunerNoDataAddr	START, addr_demod, 0xfe, addr_tuner, data*size, STOP
-Read			START, addr_demod, addr, START, addr_demod|1, [READ*8, LNOP or HNOP]*size, STOP
-ReadTuner		START, addr_demod, 0xfe, addr_data, START, addr_demod, 0xfe, addr_tuner|1, START, addr_demod|1, [READ*8, LNOP or HNOP]*size, STOP
-ReadTunerNoDataAddr	START, addr_demod, 0xfe, addr_tuner|1, START, addr_demod|1, [READ*8, LNOP or HNOP]*size, STOP
-*/
 
 int tc90522_write(struct dvb_frontend *fe, const u8 *data, int len)
 {
@@ -187,8 +169,6 @@ void tc90522_release(struct dvb_frontend *fe)
 	dev_dbg(&demod->i2c->dev, "%s #%d %s\n", demod->i2c->name, demod->idx, __func__);
 	tc90522_set_powers(demod, TC90522_PWR_OFF);
 	tc90522_sleep(fe);
-	fe->ops.tuner_ops.release(fe);
-	kfree(demod);
 }
 
 s64 tc90522_get_cn_raw(struct tc90522 *demod)
@@ -512,28 +492,56 @@ static struct dvb_frontend_ops tc90522_ops_t = {
 };
 
 /**** Common ****/
-struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_t type, u8 addr_demod, bool pwr_on)
+int tc90522_remove(struct i2c_client *client)
 {
-	struct dvb_frontend *fe;
+	dev_dbg(&client->dev, "%s\n", __func__);
+	kfree(i2c_get_clientdata(client));
+	return 0;
+}
+
+int tc90522_probe(struct i2c_client *client, const struct i2c_device_id *id)
+{
+	struct tc90522_config *cfg = client->dev.platform_data;
 	struct tc90522 *demod = kzalloc(sizeof(struct tc90522), GFP_KERNEL);
+	struct dvb_frontend *fe	= &demod->fe;
 
 	if (!demod)
-		return NULL;
-	demod->addr_demod = addr_demod;
-	demod->idx	= (!(addr_demod & 1) << 1) + ((addr_demod & 2) >> 1);
-	demod->i2c	= i2c;
-	demod->type	= type;
-	fe		= &demod->fe;
+		return -ENOMEM;
+	demod->addr_demod = client->addr;
+	demod->idx	= (!(client->addr & 1) << 1) + ((client->addr & 2) >> 1);
+	demod->i2c	= client->adapter;
+	demod->type	= cfg->type;
 	memcpy(&fe->ops, (demod->type == SYS_ISDBS) ? &tc90522_ops_s : &tc90522_ops_t, sizeof(struct dvb_frontend_ops));
 	fe->demodulator_priv = demod;
-
-	if (pwr_on && (tc90522_set_powers(demod, TC90522_PWR_TUNER_ON)	||
-			i2c_transfer(demod->i2c, NULL, 0)		||
+	if (cfg->pwr && (tc90522_set_powers(demod, TC90522_PWR_TUNER_ON)	||
+			i2c_transfer(demod->i2c, NULL, 0)			||
 			tc90522_set_powers(demod, TC90522_PWR_TUNER_ON | TC90522_PWR_AMP_ON))) {
 		tc90522_release(fe);
-		return NULL;
+		return -EIO;
 	}
-	return fe;
+	cfg->fe = fe;
+	i2c_set_clientdata(client, demod);
+	return 0;
 }
-EXPORT_SYMBOL(tc90522_attach);
+
+static struct i2c_device_id tc90522_id_table[] = {
+	{ TC90522_DRVNAME, 0 },
+	{ },
+};
+MODULE_DEVICE_TABLE(i2c, tc90522_id_table);
+
+static struct i2c_driver tc90522_driver = {
+	.driver = {
+		.owner	= THIS_MODULE,
+		.name	= tc90522_id_table->name,
+	},
+	.probe		= tc90522_probe,
+	.remove		= tc90522_remove,
+	.id_table	= tc90522_id_table,
+};
+module_i2c_driver(tc90522_driver);
+
+MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
+MODULE_DESCRIPTION("Toshiba TC90522 8PSK(ISDB-S)/OFDM(ISDB-T) PT3 quad demodulator");
+MODULE_LICENSE("GPL");
 

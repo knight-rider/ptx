@@ -19,15 +19,7 @@
 
 #include "dvb_frontend.h"
 
-#if IS_ENABLED(CONFIG_MEDIA_TUNER_QM1D1C0042)
-extern int qm1d1c0042_attach(struct dvb_frontend *fe, u8 addr_tuner);
-#else
-static inline int qm1d1c0042_attach(struct dvb_frontend *fe, u8 addr_tuner)
-{
-	dev_warn(fe->dvb->device, "%s: driver disabled by Kconfig\n", __func__);
-	return 0;
-}
-#endif
+#define QM1D1C0042_DRVNAME "qm1d1c0042"
 
 #endif
 

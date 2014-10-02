@@ -19,15 +19,13 @@
 
 #include "dvb_frontend.h"
 
-#if IS_ENABLED(CONFIG_DVB_TC90522)
-extern struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_t type, u8 addr_demod, bool pwr);
-#else
-static inline struct dvb_frontend *tc90522_attach(struct i2c_adapter *i2c, fe_delivery_system_t type, u8 addr_demod, bool pwr)
-{
-	dev_warn(&i2c->dev, "%s: driver disabled by Kconfig\n", __func__);
-	return NULL;
-}
-#endif
+#define TC90522_DRVNAME "tc90522"
+
+struct tc90522_config {
+	fe_delivery_system_t	type;	/* IN	SYS_ISDBS or SYS_ISDBT */
+	bool			pwr;	/* IN	set only once after all demods initialized */
+	struct dvb_frontend	*fe;	/* OUT	allocated frontend */
+};
 
 #endif
 

@@ -16,10 +16,6 @@
 
 #include "mxl301rf.h"
 
-MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
-MODULE_DESCRIPTION("Earthsoft PT3 MxL301RF MaxLinear CMOS Hybrid TV ISDB-T tuner driver");
-MODULE_LICENSE("GPL");
-
 struct mxl301rf {
 	struct dvb_frontend *fe;
 	u8 addr_tuner, idx;
@@ -321,41 +317,64 @@ int mxl301rf_wakeup(struct dvb_frontend *fe)
 	return 0;
 }
 
-int mxl301rf_release(struct dvb_frontend *fe)
-{
-	kfree(fe->tuner_priv);
-	fe->tuner_priv = NULL;
-	return 0;
-}
-
 static struct dvb_tuner_ops mxl301rf_ops = {
 	.info = {
-		.frequency_min	= 1,		/* actually 90 MHz, freq below that is handled as ch */
+		.frequency_min	= 1,		/* freq under 90 MHz is handled as channel */
 		.frequency_max	= 770000000,	/* Hz */
 		.frequency_step	= 142857,
 	},
 	.set_frequency = mxl301rf_tuner_rftune,
 	.sleep = mxl301rf_sleep,
 	.init = mxl301rf_wakeup,
-	.release = mxl301rf_release,
 };
 
-int mxl301rf_attach(struct dvb_frontend *fe, u8 addr_tuner)
+int mxl301rf_remove(struct i2c_client *client)
+{
+	struct dvb_frontend *fe = i2c_get_clientdata(client);
+
+	dev_dbg(&client->dev, "%s\n", __func__);
+	kfree(fe->tuner_priv);
+	fe->tuner_priv = NULL;
+	return 0;
+}
+
+int mxl301rf_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	u8 d[] = { 0x10, 0x01 };
+	struct dvb_frontend *fe = client->dev.platform_data;
 	struct mxl301rf *mx = kzalloc(sizeof(struct mxl301rf), GFP_KERNEL);
 
 	if (!mx)
 		return -ENOMEM;
 	fe->tuner_priv = mx;
 	mx->fe = fe;
-	mx->idx = (addr_tuner & 1) | 2;
-	mx->addr_tuner = addr_tuner;
+	mx->idx = (client->addr & 1) | 2;
+	mx->addr_tuner = client->addr;
 	mx->read = fe->ops.tuner_ops.calc_regs;
 	memcpy(&fe->ops.tuner_ops, &mxl301rf_ops, sizeof(struct dvb_tuner_ops));
-
+	i2c_set_clientdata(client, fe);
 	return	mxl301rf_fe_write_data(fe, 0x1c, d, 1)	||
 		mxl301rf_fe_write_data(fe, 0x1d, d+1, 1);
 }
-EXPORT_SYMBOL(mxl301rf_attach);
+
+static struct i2c_device_id mxl301rf_id_table[] = {
+	{ MXL301RF_DRVNAME, 0 },
+	{ },
+};
+MODULE_DEVICE_TABLE(i2c, mxl301rf_id_table);
+
+static struct i2c_driver mxl301rf_driver = {
+	.driver = {
+		.owner	= THIS_MODULE,
+		.name	= mxl301rf_id_table->name,
+	},
+	.probe		= mxl301rf_probe,
+	.remove		= mxl301rf_remove,
+	.id_table	= mxl301rf_id_table,
+};
+module_i2c_driver(mxl301rf_driver);
+
+MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
+MODULE_DESCRIPTION("Earthsoft PT3 MxL301RF MaxLinear CMOS Hybrid TV ISDB-T tuner driver");
+MODULE_LICENSE("GPL");
 

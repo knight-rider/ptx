@@ -16,10 +16,6 @@
 
 #include "qm1d1c0042.h"
 
-MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
-MODULE_DESCRIPTION("Earthsoft PT3 QM1D1C0042 ISDB-S tuner driver");
-MODULE_LICENSE("GPL");
-
 struct qm1d1c0042 {
 	struct dvb_frontend *fe;
 	u8 addr_tuner, idx, reg[32];
@@ -82,11 +78,6 @@ int qm1d1c0042_write(struct dvb_frontend *fe, u8 addr, u8 data)
 	return err;
 }
 
-static const u8 qm1d1c0042_flag[32] = {
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0,
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-};
-
 int qm1d1c0042_write_pskmsrst(struct dvb_frontend *fe)
 {
 	u8 data = 0x01;
@@ -144,7 +135,7 @@ int qm1d1c0042_wakeup(struct dvb_frontend *fe)
 		qm1d1c0042_write(fe, 0x05, qm->reg[0x05]);
 }
 
-void qm1d1c0042_get_channel_freq(u32 channel, u32 *number, u32 *freq)
+void qm1d1c0042_ch2freq(u32 channel, u32 *number, u32 *freq)
 {
 	if (channel < 12) {
 		*number = 1 + 2 * channel;
@@ -317,7 +308,7 @@ int qm1d1c0042_set_freq(struct dvb_frontend *fe, u32 frequency)
 
 	if (err)
 		return err;
-	qm1d1c0042_get_channel_freq(channel, &number, &freq);
+	qm1d1c0042_ch2freq(channel, &number, &freq);
 	qm->freq = freq * 10 - 500;
 	dev_dbg(fe->dvb->device, "#%d ch %d freq %d kHz\n", qm->idx, channel, qm->freq);
 
@@ -338,45 +329,67 @@ int qm1d1c0042_set_freq(struct dvb_frontend *fe, u32 frequency)
 	return locked ? qm1d1c0042_set_agc(fe, QM1D1C0042_AGC_AUTO) : -ETIMEDOUT;
 }
 
-int qm1d1c0042_release(struct dvb_frontend *fe)
-{
-	kfree(fe->tuner_priv);
-	fe->tuner_priv = NULL;
-	return 0;
-}
-
 static struct dvb_tuner_ops qm1d1c0042_ops = {
 	.info = {
-		.frequency_min	= 1,		/* actually 1024 kHz, freq below that is handled as ch */
+		.frequency_min	= 1,		/* freq under 1024 kHz is handled as channel */
 		.frequency_max	= 2150000,	/* kHz */
 		.frequency_step	= 1000,		/* = 1 MHz */
 	},
 	.set_frequency = qm1d1c0042_set_freq,
 	.sleep = qm1d1c0042_sleep,
 	.init = qm1d1c0042_wakeup,
-	.release = qm1d1c0042_release,
 };
 
-int qm1d1c0042_attach(struct dvb_frontend *fe, u8 addr_tuner)
+int qm1d1c0042_remove(struct i2c_client *client)
+{
+	struct dvb_frontend *fe = i2c_get_clientdata(client);
+
+	dev_dbg(&client->dev, "%s\n", __func__);
+	kfree(fe->tuner_priv);
+	fe->tuner_priv = NULL;
+	return 0;
+}
+
+int qm1d1c0042_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	u8 d[] = { 0x10, 0x15, 0x04 };
+	struct dvb_frontend *fe = client->dev.platform_data;
 	struct qm1d1c0042 *qm = kzalloc(sizeof(struct qm1d1c0042), GFP_KERNEL);
 
 	if (!qm)
 		return -ENOMEM;
 	fe->tuner_priv = qm;
 	qm->fe = fe;
-	qm->addr_tuner = addr_tuner;
-	qm->idx = !(addr_tuner & 1);
+	qm->idx = !(client->addr & 1);
+	qm->addr_tuner = client->addr;
 	qm->read = fe->ops.tuner_ops.calc_regs;
 	memcpy(&fe->ops.tuner_ops, &qm1d1c0042_ops, sizeof(struct dvb_tuner_ops));
-
 	memcpy(qm->reg, qm1d1c0042_reg_rw, sizeof(qm1d1c0042_reg_rw));
 	qm->freq = 0;
-
+	i2c_set_clientdata(client, fe);
 	return	qm1d1c0042_fe_write_data(fe, 0x1e, d,   1)	||
 		qm1d1c0042_fe_write_data(fe, 0x1c, d+1, 1)	||
 		qm1d1c0042_fe_write_data(fe, 0x1f, d+2, 1);
 }
-EXPORT_SYMBOL(qm1d1c0042_attach);
+
+static struct i2c_device_id qm1d1c0042_id_table[] = {
+	{ QM1D1C0042_DRVNAME, 0 },
+	{ },
+};
+MODULE_DEVICE_TABLE(i2c, qm1d1c0042_id_table);
+
+static struct i2c_driver qm1d1c0042_driver = {
+	.driver = {
+		.owner	= THIS_MODULE,
+		.name	= qm1d1c0042_id_table->name,
+	},
+	.probe		= qm1d1c0042_probe,
+	.remove		= qm1d1c0042_remove,
+	.id_table	= qm1d1c0042_id_table,
+};
+module_i2c_driver(qm1d1c0042_driver);
+
+MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
+MODULE_DESCRIPTION("Earthsoft PT3 QM1D1C0042 ISDB-S tuner driver");
+MODULE_LICENSE("GPL");
 

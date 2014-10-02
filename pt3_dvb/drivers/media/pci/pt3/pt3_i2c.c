@@ -183,7 +183,7 @@ int pt3_i2c_add_adapter(struct pt3_board *pt3)
 	i2c->algo = &pt3_i2c_algo;
 	i2c->algo_data = NULL;
 	i2c->dev.parent = &pt3->pdev->dev;
-	strcpy(i2c->name, DRV_NAME);
+	strcpy(i2c->name, PT3_DRVNAME);
 	i2c_set_adapdata(i2c, pt3);
 	return	i2c_add_adapter(i2c) ||
 		(!pt3_i2c_is_clean(pt3) && pt3_i2c_flush(pt3, false, 0));

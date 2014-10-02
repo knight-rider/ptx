@@ -1,10 +1,14 @@
-DVB driver for Earthsoft PT3 (PCIE ISDB-S/T receiver)
-=====================================================
+DVB driver for Earthsoft PT3 PCIE ISDB-S/T receiver
+===================================================
 
 Changes:
-- 32bit + 64bit clean compile (removed math64.h)
-- simpler & yet precise CNR calculation
-- CNR @ 0.0001 dB (as stated in include/uapi/linux/dvb/frontend.h, not 1/1000 dB!)
+- demod & tuners converted to I2C binding model
+- i586 & x86_64 clean compile
+- lightweight & yet precise CNR calculus
+- raw CNR (DVBv3)
+- DVBv5 CNR @ 0.0001 dB (ref: include/uapi/linux/dvb/frontend.h, not 1/1000 dB!)
+- removed tuner's *_release()
+- demod/tuner binding: pt3_unregister_subdev(), pt3_unregister_subdev()
 
 Features:
 - tuning enhancements (compared to PT1 DVB)
@@ -30,8 +34,4 @@ Full package:
 - installation:
 	$ chmod +x dkms.install dkms.uninstall
 	$ ./dkms.install
-
-・「adapter0とadapter2を両方使ってる時にadapter0のdemux0をclose()するとadapter2側でドロップ」は
-　こちらでは発生していないので、助言等含めて詳しく教えて欲しいです。
-・複数枚同時実装は未検証です。何方か環境をご提供頂くか、実験をして頂ければ幸いです。
 

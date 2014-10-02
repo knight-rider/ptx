@@ -19,15 +19,7 @@
 
 #include "dvb_frontend.h"
 
-#if IS_ENABLED(CONFIG_MEDIA_TUNER_MXL301RF)
-extern int mxl301rf_attach(struct dvb_frontend *fe, u8 addr_tuner);
-#else
-static inline int mxl301rf_attach(struct dvb_frontend *fe, u8 addr_tuner)
-{
-	dev_warn(fe->dvb->device, "%s: driver disabled by Kconfig\n", __func__);
-	return 0;
-}
-#endif
+#define MXL301RF_DRVNAME "mxl301rf"
 
 #endif
 

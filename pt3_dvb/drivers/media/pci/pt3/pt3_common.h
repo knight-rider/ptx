@@ -24,7 +24,7 @@
 #include "dmxdev.h"
 #include "dvb_frontend.h"
 
-#define DRV_NAME KBUILD_MODNAME
+#define PT3_DRVNAME KBUILD_MODNAME
 
 /* register idx */
 #define PT3_REG_VERSION	0x00	/*	R	Version		*/
@@ -74,6 +74,7 @@ struct pt3_adapter {
 	struct dmxdev dmxdev;
 	int users, voltage;
 
+	struct i2c_client *i2c_demod, *i2c_tuner;
 	struct dvb_frontend *fe;
 	int (*orig_voltage)(struct dvb_frontend *fe, fe_sec_voltage_t voltage);
 	int (*orig_sleep)(struct dvb_frontend *fe);
