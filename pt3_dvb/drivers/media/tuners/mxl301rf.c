@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  */
 
+#include "dvb_frontend.h"
 #include "mxl301rf.h"
 
 struct mxl301rf {

@@ -1,4 +1,4 @@
-pt3_dvb-objs := pt3.o pt3_dma.o pt3_i2c.o
+pt3_dvb-objs := pt3.o
 
 obj-$(CONFIG_PT3_DVB) += pt3_dvb.o
 

@@ -17,8 +17,6 @@
 #ifndef	__TC90522_H__
 #define	__TC90522_H__
 
-#include "dvb_frontend.h"
-
 #define TC90522_DRVNAME "tc90522"
 
 struct tc90522_config {

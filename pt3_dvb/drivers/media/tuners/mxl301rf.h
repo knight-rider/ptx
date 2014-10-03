@@ -17,8 +17,6 @@
 #ifndef __MXL301RF_H__
 #define __MXL301RF_H__
 
-#include "dvb_frontend.h"
-
 #define MXL301RF_DRVNAME "mxl301rf"
 
 #endif

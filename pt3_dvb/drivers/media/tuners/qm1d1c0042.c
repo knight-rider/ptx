@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  */
 
+#include "dvb_frontend.h"
 #include "qm1d1c0042.h"
 
 struct qm1d1c0042 {

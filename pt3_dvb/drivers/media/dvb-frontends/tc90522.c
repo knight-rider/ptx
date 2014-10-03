@@ -15,6 +15,7 @@
  */
 
 #include "dvb_math.h"
+#include "dvb_frontend.h"
 #include "tc90522.h"
 
 #define TC90522_PASSTHROUGH 0xfe
