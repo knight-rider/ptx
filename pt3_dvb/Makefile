@@ -24,18 +24,11 @@ $(basename $(TGT3))-objs := $(filter %.o, $(SRC3:.c=.o))
 obj-m := $(basename $(TGT0)).o $(basename $(TGT1)).o $(basename $(TGT2)).o $(basename $(TGT3)).o
 
 all: $(TGT)
-
+	make -C $(KBUILD) M=`pwd`
 $(TGT0): $(SRC0) $(HDRS)
-	KBUILD_MODNAME="$(TGT0:.ko=)" && make -C $(KBUILD) M=`pwd`
-
 $(TGT1): $(SRC1) $(HDRS)
-	KBUILD_MODNAME="$(TGT1:.ko=)" && make -C $(KBUILD) M=`pwd`
-
 $(TGT2): $(SRC2) $(HDRS)
-	KBUILD_MODNAME="$(TGT2:.ko=)" && make -C $(KBUILD) M=`pwd`
-
 $(TGT3): $(SRC3) $(HDRS)
-	KBUILD_MODNAME="$(TGT3:.ko=)" && make -C $(KBUILD) M=`pwd`
 
 debug:
 	make "EXTRA_CFLAGS += -DDEBUG $(EXTRA_CFLAGS)"
