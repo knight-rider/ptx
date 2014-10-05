@@ -2,7 +2,7 @@ PT3 用ツール集
 ============
 recpt1   : 録画ツール（stz2012版）
 pt3_drv  : chardev ドライバ
-pt3_dvb  : DVB ドライバ（RC版）
+pt3_dvb  : DVB ドライバ
 dvb_apps : DVB アプリ集
 
 周波数テーブルについては以下の値を参考にしてください(EARTH_PT.hより抜粋)

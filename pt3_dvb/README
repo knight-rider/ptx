@@ -1,6 +1,8 @@
 DVB driver for Earthsoft PT3 PCIE ISDB-S/T receiver
 ===================================================
 
+Status: stable
+
 Changes:
 - demod & tuners converted to I2C binding model
 - i586 & x86_64 clean compile
@@ -31,7 +33,12 @@ Main components:
 Full package:
 - URL:	https://github.com/knight-rider/ptx/tree/master/pt3_dvb
 - buildable as standalone, DKMS or tree embedded module
-- installation:
+- インストール方法:
+	DKMS がなければ
+	# make install
+	DKMS があれば（自動アップデート）
 	$ chmod +x dkms.install dkms.uninstall
 	$ ./dkms.install
+
+本ドライバは無償で公開・提供しています。しかし残念ながら、心無い人から誹謗中傷や横槍を受けています。
 
