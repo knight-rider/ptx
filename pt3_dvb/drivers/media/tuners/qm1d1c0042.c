@@ -19,9 +19,9 @@
 
 struct qm1d1c0042 {
 	struct dvb_frontend *fe;
+	struct i2c_adapter *i2c;
 	u8 addr_tuner, idx, reg[32];
 	u32 freq;
-	int (*read)(struct dvb_frontend *fe, u8 *buf, int buflen);
 };
 
 static const u8 qm1d1c0042_reg_rw[] = {
@@ -31,16 +31,23 @@ static const u8 qm1d1c0042_reg_rw[] = {
 	0x8c, 0xcf, 0xb8, 0xf1, 0xa8, 0xf2, 0x89, 0x00,
 };
 
+#define QM1D1C0042_I2C_THRU_FE 0xfe
+
 /* read via demodulator */
 int qm1d1c0042_fe_read(struct dvb_frontend *fe, u8 addr_data, u8 *data)
 {
 	int ret;
 	struct qm1d1c0042 *qm = fe->tuner_priv;
-	u8 addr[] = { qm->addr_tuner, addr_data };
+	u8 buf[] = { QM1D1C0042_I2C_THRU_FE, qm->addr_tuner << 1, addr_data, QM1D1C0042_I2C_THRU_FE, (qm->addr_tuner << 1) | 1, 0 };
+	struct i2c_msg msg[] = {
+		{ .addr = fe->id, .flags = 0,        .buf = buf,     .len = 3, },
+		{ .addr = fe->id, .flags = 0,        .buf = buf + 3, .len = 2, },
+		{ .addr = fe->id, .flags = I2C_M_RD, .buf = buf + 5, .len = 1, },
+	};
 
 	if ((addr_data != 0x00) && (addr_data != 0x0d))
 		return -EFAULT;
-	ret = qm->read(fe, addr, ARRAY_SIZE(addr));
+	ret = i2c_transfer(qm->i2c, msg, 3) == 3 ? buf[5] : -EREMOTEIO;
 	if (ret < 0)
 		return ret;
 	*data = ret;
@@ -57,13 +64,11 @@ int qm1d1c0042_fe_write_data(struct dvb_frontend *fe, u8 addr_data, u8 *data, in
 	return fe->ops.write(fe, buf, len + 1);
 }
 
-#define QM1D1C0042_FE_PASSTHROUGH 0xfe
-
 int qm1d1c0042_fe_write_tuner(struct dvb_frontend *fe, u8 *data, int len)
 {
 	u8 buf[len + 2];
 
-	buf[0] = QM1D1C0042_FE_PASSTHROUGH;
+	buf[0] = QM1D1C0042_I2C_THRU_FE;
 	buf[1] = ((struct qm1d1c0042 *)fe->tuner_priv)->addr_tuner << 1;
 	memcpy(buf + 2, data, len);
 	return fe->ops.write(fe, buf, len + 2);
@@ -361,9 +366,9 @@ int qm1d1c0042_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return -ENOMEM;
 	fe->tuner_priv = qm;
 	qm->fe = fe;
+	qm->i2c	= client->adapter;
 	qm->idx = !(client->addr & 1);
 	qm->addr_tuner = client->addr;
-	qm->read = fe->ops.tuner_ops.calc_regs;
 	memcpy(&fe->ops.tuner_ops, &qm1d1c0042_ops, sizeof(struct dvb_tuner_ops));
 	memcpy(qm->reg, qm1d1c0042_reg_rw, sizeof(qm1d1c0042_reg_rw));
 	qm->freq = 0;

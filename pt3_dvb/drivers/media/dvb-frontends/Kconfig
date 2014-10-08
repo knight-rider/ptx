@@ -621,7 +621,7 @@ config DVB_S5H1411
 	  An ATSC 8VSB and QAM64/256 tuner module. Say Y when you want
 	  to support this frontend.
 
-comment "ISDB-S (satellite) & ISDB-T (terrestrial) frontends"
+comment "ISDB-T (terrestrial) frontends"
 	depends on DVB_CORE
 
 config DVB_S921
@@ -647,6 +647,9 @@ config DVB_MB86A20S
 	help
 	  A driver for Fujitsu mb86a20s ISDB-T/ISDB-Tsb demodulator.
 	  Say Y when you want to support this frontend.
+
+comment "ISDB-S (satellite) & ISDB-T (terrestrial) frontends"
+	depends on DVB_CORE
 
 config DVB_TC90522
 	tristate "Toshiba TC90522"

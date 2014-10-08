@@ -6,5 +6,5 @@ config DVB_PT3
 	select MEDIA_TUNER_MXL301RF if MEDIA_SUBDRV_AUTOSELECT
 	help
 	  Support for Earthsoft PT3 PCIe cards.
-	  You need to enable frontend (TC90522) & tuners (QM1D1C0042, MXL301RF)
+
 	  Say Y or M if you own such a device and want to use it.

@@ -18,8 +18,6 @@
 #include "dvb_frontend.h"
 #include "tc90522.h"
 
-#define TC90522_PASSTHROUGH 0xfe
-
 enum tc90522_state {
 	TC90522_IDLE,
 	TC90522_SET_FREQUENCY,
@@ -350,21 +348,6 @@ int tc90522_tune_s(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 	return -ERANGE;
 }
 
-int tc90522_read_tuner_s(struct dvb_frontend *fe, u8 *addr, int len)
-{
-	struct tc90522 *demod = fe->demodulator_priv;
-	u8 buf[] = { TC90522_PASSTHROUGH, addr[0] << 1, addr[1], TC90522_PASSTHROUGH, (addr[0] << 1) | 1, 0 };
-	struct i2c_msg msg[] = {
-		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf,	.len = 3, },
-		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf + 3,	.len = 2, },
-		{ .addr = demod->addr_demod, .flags = I2C_M_RD,	.buf = buf + 5,	.len = 1, },
-	};
-
-	if (!addr || (len != 2))
-		return -EINVAL;
-	return i2c_transfer(demod->i2c, msg, 3) == 3 ? buf[5] : -EREMOTEIO;
-}
-
 static struct dvb_frontend_ops tc90522_ops_s = {
 	.delsys = { SYS_ISDBS },
 	.info = {
@@ -380,7 +363,6 @@ static struct dvb_frontend_ops tc90522_ops_s = {
 	.read_snr = tc90522_read_snr,
 	.read_status = tc90522_read_status,
 	.tune = tc90522_tune_s,
-	.tuner_ops.calc_regs = tc90522_read_tuner_s,
 };
 
 /**** ISDB-T ****/
@@ -460,20 +442,6 @@ int tc90522_tune_t(struct dvb_frontend *fe, bool re_tune, unsigned int mode_flag
 	return -ERANGE;
 }
 
-int tc90522_read_tuner_t(struct dvb_frontend *fe, u8 *addr, int len)
-{
-	struct tc90522 *demod = fe->demodulator_priv;
-	u8 buf[] = { TC90522_PASSTHROUGH, (addr[0] << 1) | 1, 0 };
-	struct i2c_msg msg[] = {
-		{ .addr = demod->addr_demod, .flags = 0,	.buf = buf,	.len = 2, },
-		{ .addr = demod->addr_demod, .flags = I2C_M_RD,	.buf = buf + 2,	.len = 1, },
-	};
-
-	if (!addr || (len != 1))
-		return -EINVAL;
-	return i2c_transfer(demod->i2c, msg, 2) == 2 ? buf[2] : -EREMOTEIO;
-}
-
 static struct dvb_frontend_ops tc90522_ops_t = {
 	.delsys = { SYS_ISDBT },
 	.info = {
@@ -489,7 +457,6 @@ static struct dvb_frontend_ops tc90522_ops_t = {
 	.read_snr = tc90522_read_snr,
 	.read_status = tc90522_read_status,
 	.tune = tc90522_tune_t,
-	.tuner_ops.calc_regs = tc90522_read_tuner_t,
 };
 
 /**** Common ****/
@@ -514,6 +481,7 @@ int tc90522_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	demod->type	= cfg->type;
 	memcpy(&fe->ops, (demod->type == SYS_ISDBS) ? &tc90522_ops_s : &tc90522_ops_t, sizeof(struct dvb_frontend_ops));
 	fe->demodulator_priv = demod;
+	fe->id		= client->addr;
 	if (cfg->pwr && (tc90522_set_powers(demod, TC90522_PWR_TUNER_ON)	||
 			i2c_transfer(demod->i2c, NULL, 0)			||
 			tc90522_set_powers(demod, TC90522_PWR_TUNER_ON | TC90522_PWR_AMP_ON))) {

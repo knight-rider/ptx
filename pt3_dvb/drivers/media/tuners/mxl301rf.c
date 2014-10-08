@@ -19,9 +19,9 @@
 
 struct mxl301rf {
 	struct dvb_frontend *fe;
+	struct i2c_adapter *i2c;
 	u8 addr_tuner, idx;
 	u32 freq;
-	int (*read)(struct dvb_frontend *fe, u8 *buf, int buflen);
 };
 
 struct shf_dvbt {
@@ -164,13 +164,13 @@ int mxl301rf_fe_write_data(struct dvb_frontend *fe, u8 addr_data, const u8 *data
 	return fe->ops.write(fe, buf, len + 1);
 }
 
-#define MXL301RF_FE_PASSTHROUGH 0xfe
+#define MXL301RF_I2C_THRU_FE 0xfe
 
 int mxl301rf_fe_write_tuner(struct dvb_frontend *fe, const u8 *data, int len)
 {
 	u8 buf[len + 2];
 
-	buf[0] = MXL301RF_FE_PASSTHROUGH;
+	buf[0] = MXL301RF_I2C_THRU_FE;
 	buf[1] = ((struct mxl301rf *)fe->tuner_priv)->addr_tuner << 1;
 	memcpy(buf + 2, data, len);
 	return fe->ops.write(fe, buf, len + 2);
@@ -180,13 +180,15 @@ int mxl301rf_fe_write_tuner(struct dvb_frontend *fe, const u8 *data, int len)
 void mxl301rf_fe_read(struct dvb_frontend *fe, u8 addr, u8 *data)
 {
 	struct mxl301rf *mx = fe->tuner_priv;
-	const u8 wbuf[2] = {0xfb, addr};
-	int ret;
+	const u8 wbuf[]	= { 0xfb, addr };
+	u8	 rbuf[]	= { MXL301RF_I2C_THRU_FE, (mx->addr_tuner << 1) | 1, 0 };
+	struct i2c_msg msg[] = {
+		{ .addr = fe->id, .flags = 0,        .buf = rbuf,     .len = 2, },
+		{ .addr = fe->id, .flags = I2C_M_RD, .buf = rbuf + 2, .len = 1, },
+	};
 
 	mxl301rf_fe_write_tuner(fe, wbuf, sizeof(wbuf));
-	ret = mx->read(fe, &mx->addr_tuner, 1);
-	if (ret >= 0)
-		*data = ret;
+	*data = mx->addr_tuner && (i2c_transfer(mx->i2c, msg, 2) == 2) ? rbuf[2] : 0;
 }
 
 void mxl301rf_idac_setting(struct dvb_frontend *fe)
@@ -349,9 +351,9 @@ int mxl301rf_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return -ENOMEM;
 	fe->tuner_priv = mx;
 	mx->fe = fe;
+	mx->i2c	= client->adapter;
 	mx->idx = (client->addr & 1) | 2;
 	mx->addr_tuner = client->addr;
-	mx->read = fe->ops.tuner_ops.calc_regs;
 	memcpy(&fe->ops.tuner_ops, &mxl301rf_ops, sizeof(struct dvb_tuner_ops));
 	i2c_set_clientdata(client, fe);
 	return	mxl301rf_fe_write_data(fe, 0x1c, d, 1)	||
