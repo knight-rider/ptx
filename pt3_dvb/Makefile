@@ -1,6 +1,9 @@
 KVER ?= `uname -r`
 KBUILD := /lib/modules/$(KVER)/build
-INSTALL_DIR := /lib/modules/$(KVER)/$(shell eval `cat $(PWD)/dkms.conf`; echo $${DEST_MODULE_LOCATION[0]})
+DST0 := /lib/modules/$(KVER)/$(shell eval `cat $(PWD)/dkms.conf`; echo $${DEST_MODULE_LOCATION[0]})
+DST1 := /lib/modules/$(KVER)/$(shell eval `cat $(PWD)/dkms.conf`; echo $${DEST_MODULE_LOCATION[1]})
+DST2 := /lib/modules/$(KVER)/$(shell eval `cat $(PWD)/dkms.conf`; echo $${DEST_MODULE_LOCATION[2]})
+DST3 := /lib/modules/$(KVER)/$(shell eval `cat $(PWD)/dkms.conf`; echo $${DEST_MODULE_LOCATION[3]})
 
 TGT0 := $(shell eval `cat $(PWD)/dkms.conf`; echo $${BUILT_MODULE_NAME[0]})
 TGT1 := $(shell eval `cat $(PWD)/dkms.conf`; echo $${BUILT_MODULE_NAME[1]})
@@ -40,16 +43,16 @@ clean-files := *.o *.ko *.mod.[co] *~
 clean-files += $(foreach DIR, (sort $(dir $(SRCS) $(HDRS))), $(addprefix $(DIR), $(clean-files)))
 
 uninstall:
-	rm -vf $(INSTALL_DIR)/$(TGT)*
+	rm -vfr $(DST0) $(DST1)/$(TGT1)* $(DST2)/$(TGT2)* $(DST3)/$(TGT3)*
 
 install: uninstall all
-	install -d $(INSTALL_DIR)
-	install -m 644 $(TGT) $(INSTALL_DIR)
+	install -d $(DST0)
+	install -m 644 $(TGT) $(DST0)
 	depmod -a $(KVER)
 
 install_compress: install
 	. $(KBUILD)/.config ; \
-	cd $(INSTALL_DIR); \
+	cd $(DST0); \
 	if [ $$CONFIG_DECOMPRESS_XZ = "y" ] ; then \
 		xz   -9e $(TGT); \
 	elif [ $$CONFIG_DECOMPRESS_BZIP2 = "y" ] ; then \

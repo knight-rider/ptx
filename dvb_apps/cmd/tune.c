@@ -38,7 +38,6 @@ static struct channel isdbs_channels[] = {
 	{  10, "★ch HV",	1202920, 0x4091 },
 	{  11, "BS11",		1202920, 0x4090 },
 	{  12, "TwellV",	1202920, 0x4092 },
-	{ 236, "BSアニマックス",	1164560, 0x4671 },
 	{ 244, "JSPORTS3",	1433080, 0x4751 },
 
 	{ 101, "BS4010 151:BS朝日1 152:BS朝日2 153:BS朝日3",		1049480, 0x4010 },
@@ -47,6 +46,9 @@ static struct channel isdbs_channels[] = {
 	{ 104, "BS4031 171:BSジャパン 172:BSジャパン2 173:BSジャパン3",	1087840, 0x4031 },
 	{ 105, "BS4450 192:WOWOWライブ",					1126200, 0x4450 },
 	{ 106, "BS4451 193:WOWOWシネマ",					1126200, 0x4451 },
+	{ 107, "BS4470 201:スターチャンネル2 202:スターチャンネル3",		1164560, 0x4470 },
+	{ 108, "BS4671 236:BSアニマックス",				1164560, 0x4671 },
+	{ 109, "BS4672 256:ディズニーチャンネル",				1164560, 0x4672 },
 
 	{ 204, "CS7040",	1653000, 0x7040 },
 	{ 206, "CS7060 294:ホームドラマ 323:MTV-HD 329:歌謡ポップス 340:ディスカバリー 341:アニマルプラネット 354:CNNj",	1693000, 0x7060},
@@ -167,10 +169,10 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "Usage: %s adapter_no channel_id\n", argv[0]);
 		fprintf(stderr, "\nSatellite channels:\n");
 		for (i = 0; i < ARRAY_SIZE(isdbs_channels); i++)
-			fprintf(stderr, "	%d	%s\n", isdbs_channels[i].id, isdbs_channels[i].name);
+			fprintf(stderr, "  %d	%s\n", isdbs_channels[i].id, isdbs_channels[i].name);
 		fprintf(stderr, "\nTerrestrial channels:\n");
 		for (i = 0; i < ARRAY_SIZE(isdbt_channels); i++)
-			fprintf(stderr, "	%d	%s\n", isdbt_channels[i].id, isdbt_channels[i].name);
+			fprintf(stderr, "  %d	%s\n", isdbt_channels[i].id, isdbt_channels[i].name);
 		return 1;
 	}
 	adapter_nr = strtol(argv[1], NULL, 0);
