@@ -15,10 +15,6 @@
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
 
-#ifndef DTV_ISDBS_TS_ID
-#define DTV_ISDBS_TS_ID 42
-#endif
-
 static uint32_t freq, ts_id;
 static bool scan_all = true, volt = false, cont = true;
 static enum {TER, BS, CS110} mode = TER;
@@ -169,7 +165,7 @@ static void make_output(unsigned char *sdt, int len)
 					printf("|DTV_FREQUENCY=%d", freq);
 
 					if (mode != TER)
-						printf("|DTV_ISDBS_TS_ID=0x%04x", ts_id);
+						printf("|DTV_STREAM_ID=0x%04x", ts_id);
 
 					printf(":%d\n", svc_id);
 				}
@@ -309,7 +305,7 @@ int main(int argc, char **argv)
 		tvp[0].cmd = DTV_FREQUENCY;
 		tvp[0].u.data = freq;
 		if (mode != TER) {
-			tvp[1].cmd = DTV_ISDBS_TS_ID;
+			tvp[1].cmd = DTV_STREAM_ID;
 			tvp[1].u.data = ts_id;
 			tvp[2].cmd = DTV_TUNE;
 			tvp[2].u.data = 1;
@@ -338,7 +334,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, " no lock. skipped.\n");
 			continue;
 		}
-		fprintf(stderr, "locked..");
+		fprintf(stderr, " locked:\n");
 
 		if (mode != TER) {
 			sdtfilter.filter.filter[1] = (ts_id & 0xFF00) >> 8;
