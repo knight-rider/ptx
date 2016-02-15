@@ -14,10 +14,10 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __QM1D1C0042_H__
-#define __QM1D1C0042_H__
+#ifndef QM1D1C0042_H
+#define QM1D1C0042_H
 
-#define QM1D1C0042_DRVNAME "qm1d1c0042"
+#define QM1D1C0042_MODNAME "qm1d1c0042"
 
 #endif
 

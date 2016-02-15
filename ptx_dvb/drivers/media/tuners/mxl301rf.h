@@ -1,5 +1,5 @@
 /*
- * DVB driver for Earthsoft PT3 ISDB-S/T PCI-E card
+ * Sharp VA4M6JC2103 - Earthsoft PT3 ISDB-T tuner MaxLinear CMOS Hybrid TV MxL301RF
  *
  * Copyright (C) 2014 Budi Rachmanto, AreMa Inc. <info@are.ma>
  *
@@ -14,10 +14,10 @@
  * GNU General Public License for more details.
  */
 
-#ifndef	__PT3_H__
-#define	__PT3_H__
+#ifndef MXL301RF_H
+#define MXL301RF_H
 
-#define PT3_DRVNAME KBUILD_MODNAME
+#define MXL301RF_MODNAME "mxl301rf"
 
 #endif
 

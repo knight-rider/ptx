@@ -1,9 +1,47 @@
+DVB driver for Earthsoft PT3 & PLEX PX-Q3PE PCIE ISDB-S/T receivers
+===================================================================
+
+Status: stable
+
+Features:
+1. in addition to the real frequency:
+	ISDB-S : freq. channel ID
+	ISDB-T : freq# (I/O# +128), ch#, ch# +64 for CATV
+2. in addition to TSID:
+	ISDB-S : slot#
+
+Main components:
+A. PT3:
+1. Altera	EP4CGX15BF14C8N	: customized FPGA PCI bridge
+2. Toshiba	TC90522XBG	: quad demodulator (2ch OFDM + 2ch 8PSK)
+3. Sharp	VA4M6JC2103	: contains 2 ISDB-S + 2 ISDB-T tuners
+	ISDB-S : Sharp QM1D1C0042 RF-IC
+	ISDB-T : MaxLinear CMOS Hybrid TV MxL301RF
+
+B. PX-Q3PE:
+1. ASICEN	ASV5220		: PCI-E bridge
+2. Toshiba	TC90522XBG	: quad demodulator (2ch OFDM + 2ch 8PSK)
+3. NXP Semiconductors TDA20142	: ISDB-S tuner
+4. Newport Media NM120		: ISDB-T tuner
+5. ASICEN	ASIE5606X8	: crypting controller
+	- proper keys required to use the H/W
+
+Full package:
+- URL:	https://github.com/knight-rider/ptx
+- buildable as standalone, DKMS or tree embedded module
+- インストール方法:
+	DKMS がなければ
+	# make install
+	DKMS があれば（自動アップデート）
+	$ chmod +x dkms.install dkms.uninstall
+	$ ./dkms.install
+
 PT3 用ツール集
 ============
 recpt1   : 録画ツール（stz2012版）
-pt3_drv  : chardev ドライバ
-pt3_dvb  : DVB ドライバ
+pt3_drv  : PT3 ドライバ cdev 版
 dvb_apps : DVB アプリ集
+ptx_dvb  : PT3 & PXQ3PE ドライバ DVB 版 + PXQ3PE ドライバ cdev 版
 
 周波数テーブルについては以下の値を参考にしてください(EARTH_PT.hより抜粋)
 (ISDB-S)
@@ -63,7 +101,7 @@ C24〜C27 は、ケーブルテレビ局により下記の周波数で送信さ�
 | C27 | 251+1/7 |
 +-----+---------+
 
-I2C について：
+PT3 I2C について：
 SDKとすり合わせて見ました。ほぼPT_Device.hのInitTunerと合致してますね。
 ただ、//LPF Tuning Onのところから関数が終わるまで(91,11,93,13で始まるやつ)
 SLEEPあるはずの場所にSLEEPが無い点がSDKと違うようです
