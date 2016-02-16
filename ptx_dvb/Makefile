@@ -6,7 +6,7 @@ SRCS := $(shell find $(PWD) -name "*.c")
 HDRS := $(shell find $(PWD) -name "*.h")
 INCS := $(addprefix -I, $(sort $(dir $(HDRS))))
 ldflags-y += -s
-ccflags-y += -O3 -Os -Wformat=2 -Wall -Werror -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends $(INCS)
+ccflags-y += -O3 -Os -Wformat=2 -Wall -Werror $(INCS) -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends
 MODS := $(shell eval source $(PWD)/dkms.conf; echo $${BUILT_MODULE_NAME[*]})
 DIRS := $(addprefix /lib/modules/$(KVER), $(shell eval source $(PWD)/dkms.conf; echo $${DEST_MODULE_LOCATION[*]}))
 DIR0 := $(firstword $(DIRS))
@@ -31,6 +31,8 @@ clean-files += $(foreach DIR, $(shell find $(PWD) -type d), $(addprefix $(DIR)/,
 clean:
 	make -C $(KBUILD) M=`pwd` clean
 	@$(RM) -v $(clean-files)
+
+check:
 	$(KBUILD)/scripts/checkpatch.pl --no-tree --max-line-length=200 -f `find \( -iname "*c" -o -iname "*h" \)`
 
 uninstall:
