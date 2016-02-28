@@ -137,13 +137,13 @@ int qm1d1c0042_tune(struct dvb_frontend *fe)
 	};
 	int	err	= qm1d1c0042_set_agc(fe, QM1D1C0042_AGC_MANUAL);
 	u32	kHz	= fe->dtv_property_cache.frequency,
-		ch	= freq2ch(kHz),
+		ch	= freq2ch(kHz) % ARRAY_SIZE(sd_tab),
 		N	= sd_tab[ch][1],
 		A	= sd_tab[ch][2],
 		sd	= 0,
 		i;
 
-	if (err || ch >= 24)
+	if (err)
 		return -EIO;
 	t->reg[0x08] &= 0xf0;
 	t->reg[0x08] |= 0x09;
