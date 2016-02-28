@@ -204,7 +204,7 @@ int pt3_thread(void *dat)
 	struct ptx_adap	*adap	= dat;
 	struct pt3_adap	*p	= adap->priv;
 	struct pt3_dma	*ts;
-	u32		i,
+	int		i,
 			prev;
 	size_t		csize,
 			remain	= 0;
