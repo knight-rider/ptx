@@ -32,8 +32,11 @@ clean:
 	make -C $(KBUILD) M=`pwd` clean
 	@$(RM) -v $(clean-files)
 
-check:
-	$(KBUILD)/scripts/checkpatch.pl --no-tree --max-line-length=200 -f `find \( -iname "*c" -o -iname "*h" \)`
+check: clean
+	if [ -f /data/guest/smatch/smatch ] ; then \
+		make CHECK="/data/guest/smatch/smatch --full-path" CC=/data/guest/smatch/cgcc |& tee warns~; \
+	fi
+	$(KBUILD)/scripts/checkpatch.pl --no-tree --max-line-length=200 -f `find \( -iname "*c" -o -iname "*h" \)` | tee -a warns~
 
 uninstall:
 	rm -vfr $(DSTS)
@@ -46,11 +49,11 @@ install: uninstall all
 install_compress: install
 	. $(KBUILD)/.config ; \
 	cd $(DIR0); \
-	if [ $$CONFIG_DECOMPRESS_XZ = "y" ] ; then \
+	if [ $$CONFIG_DECOMPRESS_XZ = "y" ]; then \
 		xz -9e $(TGTS); \
-	elif [ $$CONFIG_DECOMPRESS_BZIP2 = "y" ] ; then \
+	elif [ $$CONFIG_DECOMPRESS_BZIP2 = "y" ]; then \
 		bzip2 -9 $(TGTS); \
-	elif [ $$CONFIG_DECOMPRESS_GZIP = "y" ] ; then \
+	elif [ $$CONFIG_DECOMPRESS_GZIP = "y" ]; then \
 		gzip -9 $(TGTS); \
 	fi
 	depmod -a $(KVER)

@@ -376,7 +376,7 @@ int pxq3pe_thread(void *dat)
 				for (k = 0; k < 8; k++, i++)
 					rbuf[i] ^= xor[idx[k]];
 		}
-		dvb_dmx_swfilter_raw(&adap->demux, rbuf, sz);
+		dvb_dmx_swfilter(&adap->demux, rbuf, sz);
 		p->sBufStart = (p->sBufStart + sz) % p->sBufSize;
 		p->sBufByteCnt -= sz;
 	}

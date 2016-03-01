@@ -1,5 +1,5 @@
 TGT_APP = nitdump dumpts dumpts2 s2scan ptsdump restamp dumpeid tune checksignal fixpat fixpcr jzap
-TGT_LIB = libarib_b24.so
+TGT_LIB = libarib24.so
 OBJ_LIB = arib_b24_str.o
 HEADERS = arib_b24_str.h
 

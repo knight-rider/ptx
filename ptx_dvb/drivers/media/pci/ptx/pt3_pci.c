@@ -216,7 +216,7 @@ int pt3_thread(void *dat)
 			remain = p->ts_info[p->ts_pos].sz;
 			mutex_lock(&adap->lock);
 			while (remain > 0) {
-				for (i = 0; i < 20; i++) {
+				for (i = 0; i < 500; i++) {
 					struct pt3_dma	*ts;
 					u32	next	= p->ts_pos + 1;
 
@@ -225,9 +225,9 @@ int pt3_thread(void *dat)
 					ts = &p->ts_info[next];
 					if (ts->dat[ts->pos] == PTX_TS_SYNC)
 						break;
-					msleep_interruptible(30);
+					msleep_interruptible(1);
 				}
-				if (i == 20)
+				if (i == 500)
 					break;
 				prev = p->ts_pos - 1;
 				if (prev < 0 || p->ts_count <= prev)
@@ -236,7 +236,7 @@ int pt3_thread(void *dat)
 				while (remain > 0) {
 					csize = (remain < (ts->sz - ts->pos)) ?
 						 remain : (ts->sz - ts->pos);
-					dvb_dmx_swfilter_raw(&adap->demux, &ts->dat[ts->pos], csize);
+					dvb_dmx_swfilter(&adap->demux, &ts->dat[ts->pos], csize);
 					remain -= csize;
 					ts->pos += csize;
 					if (ts->pos < ts->sz)
@@ -354,12 +354,14 @@ int pt3_power(struct dvb_frontend *fe, u8 pwr)
 void pt3_remove(struct pci_dev *pdev)
 {
 	struct ptx_card	*card	= pci_get_drvdata(pdev);
-	struct pt3_card	*c	= card->priv;
-	struct ptx_adap *adap	= card->adap;
+	struct pt3_card	*c;
+	struct ptx_adap *adap;
 	int i;
 
 	if (!card)
 		return;
+	c	= card->priv;
+	adap	= card->adap;
 	for (i = 0; i < card->adapn; i++, adap++) {
 		pt3_dma_run(adap, false);
 		pt3_dma_free(adap);
@@ -397,7 +399,7 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	};
 	struct ptx_card	*card	= ptx_alloc(pdev, KBUILD_MODNAME, ARRAY_SIZE(pt3_subdev_info),
 					sizeof(struct pt3_card), sizeof(struct pt3_adap), pt3_lnb);
-	struct pt3_card	*c	= card->priv;
+	struct pt3_card	*c;
 	struct ptx_adap	*adap;
 
 	bool dma_create(void)
@@ -470,6 +472,7 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (i != 1)
 		return ptx_abort(pdev, pt3_remove, -EINVAL, "Revision 0x%X is not supported", i);
 	pci_set_master(pdev);
+	c		= card->priv;
 	c->bar_reg	= pci_ioremap_bar(pdev, 0);
 	c->bar_mem	= pci_ioremap_bar(pdev, 2);
 	if (!c->bar_reg || !c->bar_mem)
