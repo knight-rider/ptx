@@ -11,7 +11,7 @@ REVISION = 1
 VER = $(MAJOR).$(MINOR).$(REVISION)
 SONAME = $(TGT_LIB).$(MAJOR)
 TARGETS = $(TGT_APP) $(TGT_LIB)
-CFLAGS += -Wformat=2 -Wall -Werror -lm -fPIC
+CFLAGS += -Wl,--no-as-needed -Wformat=2 -Wall -Werror -lm -fPIC
 
 all: $(TARGETS)
 
