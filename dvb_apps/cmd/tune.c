@@ -128,7 +128,7 @@ int search(int adapter_nr, int channel_id)
 		}
 		usleep(125 * 1000);
 	}
-	fprintf(stderr, "#%d Failed to tune to %s (status %02x)\n",
+	fprintf(stderr, "#%d Failed to tune %s, status 0x%02X\n",
 		adapter_nr, channel->name, status);
 out:
 	close(fd);

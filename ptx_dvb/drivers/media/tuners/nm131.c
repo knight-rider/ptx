@@ -8,42 +8,38 @@
 #include "dvb_frontend.h"
 #include "nm131.h"
 
-struct nm131 {
-	struct i2c_adapter *i2c;
-};
-
 bool nm131_w(struct dvb_frontend *fe, u16 slvadr, u32 val, u32 sz)
 {
-	struct nm131 *t = fe->tuner_priv;
-	u8	buf[]	= {0xFE, 0xCE, slvadr >> 8, slvadr & 0xFF, 0, 0, 0, 0};
-	struct i2c_msg msg[] = {
-		{.addr = fe->id,	.flags = 0,	.buf = buf,	.len = sz + 4,},
+	struct i2c_client	*d	= fe->demodulator_priv;
+	u8		buf[]	= {0xFE, 0xCE, slvadr >> 8, slvadr & 0xFF, 0, 0, 0, 0};
+	struct i2c_msg	msg[]	= {
+		{.addr = d->addr,	.flags = 0,	.buf = buf,	.len = sz + 4,},
 	};
 
 	*(u32 *)(buf + 4) = slvadr == 0x36 ? val & 0x7F : val;
-	return i2c_transfer(t->i2c, msg, 1) == 1;
+	return i2c_transfer(d->adapter, msg, 1) == 1;
 }
 
 bool nm131_w8(struct dvb_frontend *fe, u8 slvadr, u8 dat)
 {
-	struct nm131 *t = fe->tuner_priv;
-	u8 buf[] = {slvadr, dat};
-	struct i2c_msg msg[] = {
-		{.addr = fe->id,	.flags = 0,	.buf = buf,	.len = 2,},
+	struct i2c_client	*d	= fe->demodulator_priv;
+	u8		buf[]	= {slvadr, dat};
+	struct i2c_msg	msg[]	= {
+		{.addr = d->addr,	.flags = 0,	.buf = buf,	.len = 2,},
 	};
-	return i2c_transfer(t->i2c, msg, 1) == 1;
+	return i2c_transfer(d->adapter, msg, 1) == 1;
 }
 
 bool nm131_r(struct dvb_frontend *fe, u16 slvadr, u8 *dat, u32 sz)
 {
-	struct nm131 *t = fe->tuner_priv;
-	u8	rcmd[]	= {0xFE, 0xCF},
-		buf[sz];
-	struct i2c_msg msg[] = {
-		{.addr = fe->id,	.flags = 0,		.buf = rcmd,	.len = 2,},
-		{.addr = fe->id,	.flags = I2C_M_RD,	.buf = buf,	.len = sz,},
+	struct i2c_client	*d	= fe->demodulator_priv;
+	u8		rcmd[]	= {0xFE, 0xCF},
+			buf[sz];
+	struct i2c_msg	msg[]	= {
+		{.addr = d->addr,	.flags = 0,		.buf = rcmd,	.len = 2,},
+		{.addr = d->addr,	.flags = I2C_M_RD,	.buf = buf,	.len = sz,},
 	};
-	bool	ret = nm131_w(fe, slvadr, 0, 0) && i2c_transfer(t->i2c, msg, 2) == 2;
+	bool	ret = nm131_w(fe, slvadr, 0, 0) && i2c_transfer(d->adapter, msg, 2) == 2;
 
 	memcpy(dat, buf, sz);
 	return ret;
@@ -180,17 +176,7 @@ int nm131_tune(struct dvb_frontend *fe)
 		0 : -EIO;
 }
 
-static struct dvb_tuner_ops nm131_ops = {
-	.set_params = nm131_tune,
-};
-
-int nm131_remove(struct i2c_client *c)
-{
-	kfree(i2c_get_clientdata(c));
-	return 0;
-}
-
-int nm131_probe(struct i2c_client *c, const struct i2c_device_id *id)
+int nm131_probe(struct i2c_client *t, const struct i2c_device_id *id)
 {
 	struct tnr_rf_reg_t {
 		u8 slvadr;
@@ -215,29 +201,24 @@ int nm131_probe(struct i2c_client *c, const struct i2c_device_id *id)
 		{356, 2048},	{448, 764156359}
 	};
 	u8			i;
-	struct nm131		*t	= kzalloc(sizeof(struct nm131), GFP_KERNEL);
-	struct dvb_frontend	*fe	= c->dev.platform_data;
+	struct dvb_frontend	*fe	= t->dev.platform_data;
 
-	if (!t)
-		return -ENOMEM;
-	t->i2c	= c->adapter;
-	fe->tuner_priv = t;
-	memcpy(&fe->ops.tuner_ops, &nm131_ops, sizeof(struct dvb_tuner_ops));
-	i2c_set_clientdata(c, t);
-
-	nm131_w8(fe, 0xB0, 0xA0)	&&
-	nm131_w8(fe, 0xB2, 0x3D)	&&
-	nm131_w8(fe, 0xB3, 0x25)	&&
-	nm131_w8(fe, 0xB4, 0x8B)	&&
-	nm131_w8(fe, 0xB5, 0x4B)	&&
-	nm131_w8(fe, 0xB6, 0x3F)	&&
-	nm131_w8(fe, 0xB7, 0xFF)	&&
-	nm131_w8(fe, 0xB8, 0xC0)	&&
-	nm131_w8(fe, 3, 0)		&&
-	nm131_w8(fe, 0x1D, 0)		&&
-	nm131_w8(fe, 0x1F, 0)		&&
-	(nm131_w8(fe, 0xE, 0x77), nm131_w8(fe, 0xF, 0x13), nm131_w8(fe, 0x75, 2));
-
+	fe->ops.tuner_ops.set_params	= nm131_tune;
+	if (nm131_w8(fe, 0xB0, 0xA0)		&&
+		nm131_w8(fe, 0xB2, 0x3D)	&&
+		nm131_w8(fe, 0xB3, 0x25)	&&
+		nm131_w8(fe, 0xB4, 0x8B)	&&
+		nm131_w8(fe, 0xB5, 0x4B)	&&
+		nm131_w8(fe, 0xB6, 0x3F)	&&
+		nm131_w8(fe, 0xB7, 0xFF)	&&
+		nm131_w8(fe, 0xB8, 0xC0)	&&
+		nm131_w8(fe, 3, 0)		&&
+		nm131_w8(fe, 0x1D, 0)		&&
+		nm131_w8(fe, 0x1F, 0)) {
+		nm131_w8(fe, 0xE, 0x77);
+		nm131_w8(fe, 0xF, 0x13);
+		nm131_w8(fe, 0x75, 2);
+	}
 	for (i = 0; i < ARRAY_SIZE(tnr_rf_defaults_lut); i++)
 		nm131_w(fe, tnr_rf_defaults_lut[i].slvadr, tnr_rf_defaults_lut[i].val, 1);
 	nm131_r(fe, 0x36, &i, 1);
@@ -257,12 +238,8 @@ static struct i2c_device_id nm131_id[] = {
 MODULE_DEVICE_TABLE(i2c, nm131_id);
 
 static struct i2c_driver nm131_driver = {
-	.driver = {
-		.owner	= THIS_MODULE,
-		.name	= nm131_id->name,
-	},
+	.driver.name	= nm131_id->name,
 	.probe		= nm131_probe,
-	.remove		= nm131_remove,
 	.id_table	= nm131_id,
 };
 module_i2c_driver(nm131_driver);

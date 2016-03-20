@@ -50,6 +50,10 @@ enum ePXQ3PE {
 	PKT_BYTES	= 188,
 	PKT_BUFLEN	= PKT_BYTES * 312,
 
+	PXQ3PE_MOD_GPIO		= 0,
+	PXQ3PE_MOD_TUNER	= 1,
+	PXQ3PE_MOD_STAT		= 2,
+
 	PXQ3PE_INT_STAT		= 0x808,
 	PXQ3PE_INT_CLEAR	= 0x80C,
 	PXQ3PE_INT_ACTIVE	= 0x814,
@@ -113,10 +117,10 @@ struct pxq3pe_adap {
 	struct dvb_frontend	fe;
 };
 
-struct pxq3pe_card	*gCard[PXQ3PE_MAXCARD]	= {NULL};
-struct class		*pxq3pe_class		= NULL;
+struct pxq3pe_card	*gCard[PXQ3PE_MAXCARD];
+struct class		*pxq3pe_class;
 
-bool pxq3pe_i2c_w(struct pxq3pe_card *card, u8 slvadr, u8 regadr, u8 *wdat, u8 bytelen, u8 mode)
+bool pxq3pe_w(struct pxq3pe_card *card, u8 slvadr, u8 regadr, u8 *wdat, u8 bytelen, u8 mode)
 {
 	void __iomem	*bar	= card->bar;
 	int	i,
@@ -129,15 +133,15 @@ bool pxq3pe_i2c_w(struct pxq3pe_card *card, u8 slvadr, u8 regadr, u8 *wdat, u8 b
 		return false;
 	writel(0, bar + PXQ3PE_I2C_CTL_STAT);
 	switch (mode) {
-	case PTX_MODE_GPIO:
+	case PXQ3PE_MOD_GPIO:
 		i2cCtlByte = 0xC0;
 		break;
-	case PTX_MODE_TUNER:
+	case PXQ3PE_MOD_TUNER:
 		slvadr = 2 * slvadr + 0x20;
 		regadr = 0;
 		i2cCtlByte = 0x80;
 		break;
-	case PTX_MODE_STAT:
+	case PXQ3PE_MOD_STAT:
 		slvadr = 2 * slvadr + 0x20;
 		regadr = 0;
 		i2cCtlByte = 0x84;
@@ -173,7 +177,7 @@ bool pxq3pe_i2c_w(struct pxq3pe_card *card, u8 slvadr, u8 regadr, u8 *wdat, u8 b
 	return j < 1000 ? !(readl(bar + PXQ3PE_I2C_CTL_STAT) & 0x280000) : false;
 }
 
-bool pxq3pe_i2c_r(struct pxq3pe_card *card, u8 slvadr, u8 regadr, u8 *rdat, u8 bytelen, u8 mode)
+bool pxq3pe_r(struct pxq3pe_card *card, u8 slvadr, u8 regadr, u8 *rdat, u8 bytelen, u8 mode)
 {
 	void __iomem	*bar	= card->bar;
 	u8	buf[4]		= {0},
@@ -190,18 +194,18 @@ bool pxq3pe_i2c_r(struct pxq3pe_card *card, u8 slvadr, u8 regadr, u8 *rdat, u8 b
 		return false;
 	writel(0, bar + PXQ3PE_I2C_CTL_STAT);
 	switch (mode) {
-	case PTX_MODE_GPIO:
+	case PXQ3PE_MOD_GPIO:
 		i2cCtlByte = 0xE0;
 		break;
-	case PTX_MODE_TUNER:
+	case PXQ3PE_MOD_TUNER:
 		slvadr = 2 * slvadr + 0x20;
 		regadr = 0;
 		i2cCtlByte = 0xA0;
 		break;
-	case PTX_MODE_STAT:
+	case PXQ3PE_MOD_STAT:
 		*buf = regadr;
-		return	pxq3pe_i2c_w(card, slvadr, 0, buf, 1, PTX_MODE_TUNER)	&&
-			pxq3pe_i2c_r(card, slvadr, 0, rdat, bytelen, PTX_MODE_TUNER);
+		return	pxq3pe_w(card, slvadr, 0, buf, 1, PXQ3PE_MOD_TUNER)	&&
+			pxq3pe_r(card, slvadr, 0, rdat, bytelen, PXQ3PE_MOD_TUNER);
 	default:
 		return false;
 	}
@@ -255,22 +259,21 @@ int pxq3pe_i2c_xfr(struct i2c_adapter *i2c, struct i2c_msg *msg, int sz)
 	for (i = 0; i < sz && ret; i++, msg++) {
 		u8	slvadr	= msg->addr >> 8,
 			regadr	= msg->addr & 0xFF,
-			mode	= slvadr == PXQ3PE_I2C_ADR_GPIO ? PTX_MODE_GPIO : slvadr & 0x80 ? PTX_MODE_STAT : PTX_MODE_TUNER;
+			mode	= slvadr == PXQ3PE_I2C_ADR_GPIO ? PXQ3PE_MOD_GPIO : slvadr & 0x80 ? PXQ3PE_MOD_STAT : PXQ3PE_MOD_TUNER;
 
 		mutex_lock(&card->lock);
 		if (msg->flags & I2C_M_RD) {
 			u8 buf[sz];
 
-			ret = pxq3pe_i2c_r(card, slvadr, regadr, buf, msg->len, mode);
+			ret = pxq3pe_r(card, slvadr, regadr, buf, msg->len, mode);
 			memcpy(msg->buf, buf, msg->len);
 		} else
-			ret = pxq3pe_i2c_w(card, slvadr, regadr, msg->buf, msg->len, mode);
+			ret = pxq3pe_w(card, slvadr, regadr, msg->buf, msg->len, mode);
 		mutex_unlock(&card->lock);
 	}
 	return i;
 }
 
-/////////////////////////////////////////////////////
 #include "tda2014x.h"
 
 struct tda2014x {
@@ -347,11 +350,11 @@ int tda2014x_tune(struct dvb_frontend *fe)
 	u8	PredividerRatio,
 		val;
 	u64	kHz = fe->dtv_property_cache.frequency,
-		ulResLsb,
-		ulPremain,
+		ResLsb,
+		Premain,
 		ulCalcPrecision = 1000000,
-		ulkint,
-		ulNint,
+		kint,
+		Nint,
 		ulR,
 		DsmFracInReg,
 		DsmIntInReg,
@@ -359,18 +362,17 @@ int tda2014x_tune(struct dvb_frontend *fe)
 	int	ePllRefClkRatio,
 		i = kHz <= 1075000 ? 0 : kHz <= 1228000 ? 1 : kHz <= 1433000 ? 2 : kHz <= 1720000 ? 3 : 4;
 
-dev_dbg(fe->dvb->device, "%s ch %d kHz %lld", __func__, fe->id, kHz);	// fix this
 	if (t->kHz == kHz)
 		return 0;
 	if (kHz > fe->ops.tuner_ops.info.frequency_max)
 		return -ERANGE;
 
-	// GetLoConfig
+	/* GetLoConfig */
 	if (!tda2014x_r8(fe, 0x25, 3, 1, &val))
 		return -EIO;
 	bInputMuxEnable = val;
 
-	// SetLoConfig
+	/* SetLoConfig */
 	tda2014x_w16(fe, 0x22, 0, 8, 0, 0, 6,
 		(bDoublerEnable[i] << 7) | (bDcc1Enable[i] << 6) | (bDcc2Enable[i] << 5) | 0b11110 | bPpfEnable[i]) &&
 	tda2014x_r8(fe, 0x23, 0, 8, &val) &&
@@ -378,60 +380,60 @@ dev_dbg(fe->dvb->device, "%s ch %d kHz %lld", __func__, fe->id, kHz);	// fix thi
 		(bSelectDivideBy4Or5Or6Or7Path[i] << 3) | (bSelectDivideBy8Path[i] << 2) | (val & 0b1010011)) &&
 	tda2014x_w16(fe, 0x25, 3, 1, 0, 1, 6, bInputMuxEnable);
 
-	ulResLsb = (8 - i) * kHz * 1000 / 27;	// Xtal 27 MHz
-	ulkint = ulResLsb;
-	v15 = ulResLsb / 1000000;
+	ResLsb = (8 - i) * kHz * 1000 / 27;	/* Xtal 27 MHz */
+	kint = ResLsb;
+	v15 = ResLsb / 1000000;
 	ulR = 1;
-	ulPremain = 2;
-	ulNint = v15 * ulR / ulPremain;
-	if (ulNint < 131) {
-		ulPremain = 1;
-		ulNint = v15 * ulR / ulPremain;
-		if (ulNint > 251) {
+	Premain = 2;
+	Nint = v15 * ulR / Premain;
+	if (Nint < 131) {
+		Premain = 1;
+		Nint = v15 * ulR / Premain;
+		if (Nint > 251) {
 			ulR = 3;
-			ulPremain = 4;
+			Premain = 4;
 			goto LABEL_36;
 		}
-		if (ulNint < 131) {
+		if (Nint < 131) {
 			ulR = 3;
-			ulPremain = 2;
+			Premain = 2;
 			goto LABEL_36;
 		}
-	} else if (ulNint > 251) {
-		ulPremain = 4;
-		ulNint = v15 * ulR / ulPremain;
-		if (ulNint > 251) {
+	} else if (Nint > 251) {
+		Premain = 4;
+		Nint = v15 * ulR / Premain;
+		if (Nint > 251) {
 			ulR = 3;
-			ulPremain = 4;
+			Premain = 4;
 		}
 LABEL_36:
-		ulNint = v15 * ulR / ulPremain;
-		if (ulNint < 131 || ulNint > 251)
+		Nint = v15 * ulR / Premain;
+		if (Nint < 131 || Nint > 251)
 			return -ERANGE;
 	}
-	switch (100 * ulR / ulPremain) {
+	switch (100 * ulR / Premain) {
 	case 25:
-		ulkint = ulResLsb / 4;
+		kint = ResLsb / 4;
 		break;
 	case 50:
-		ulkint = ulResLsb / 2;
+		kint = ResLsb / 2;
 		break;
 	case 75:
-		ulkint = ulResLsb / 2 + ulResLsb / 4;
+		kint = ResLsb / 2 + ResLsb / 4;
 		break;
 	case 100:
 		break;
 	case 150:
-		ulkint = ulResLsb / 2 + ulResLsb;
+		kint = ResLsb / 2 + ResLsb;
 		break;
 	default:
 		return -ERANGE;
 	}
-	ulkint		= (ulkint / 10) * 10;
+	kint		= (kint / 10) * 10;
 	ePllRefClkRatio	= ulR == 2 ? 1 : ulR == 3 ? 2 : 0;
-	PredividerRatio	= ulPremain == 2 ? 0 : 1;
-	DsmIntInReg	= ulkint / 1000000;
-	DsmFracInReg	= ulkint - 1000000 * DsmIntInReg;
+	PredividerRatio	= Premain == 2 ? 0 : 1;
+	DsmIntInReg	= kint / 1000000;
+	DsmFracInReg	= kint - 1000000 * DsmIntInReg;
 	for (i = 0; i < 16; i++) {
 		DsmFracInReg *= 2;
 		if (DsmFracInReg > 0xFFFFFFF && i != 15) {
@@ -442,12 +444,12 @@ LABEL_36:
 	t->kHz = kHz;
 	return	-EIO * !(tda2014x_w16(fe, 3, 6, 2, 0, 1, 6, ePllRefClkRatio)	&&
 
-		// SetPllDividerConfig
+		/* SetPllDividerConfig */
 		tda2014x_w16(fe, 0x1A, 5, 1, 0, 1, 6, PredividerRatio)				&&
 		tda2014x_w16(fe, 0x1E, 0, 8, 0, 0, 6, DsmIntInReg - 128)			&&
 		tda2014x_w16(fe, 0x1F, 0, 0x10, 2, 0, 6, DsmFracInReg / ulCalcPrecision)	&&
 
-		// ProgramVcoChannelChange
+		/* ProgramVcoChannelChange */
 		tda2014x_r8(fe, 0x12, 0, 8, &val)				&&
 		tda2014x_w16(fe, 0x12, 0, 8, 0, 0, 6, (val & 0x7F) | 0x40)	&&
 		tda2014x_w16(fe, 0x13, 0, 2, 0, 1, 6, 2)			&&
@@ -462,11 +464,11 @@ LABEL_36:
 		tda2014x_r8(fe, 0x12, 0, 8, &val)				&&
 		tda2014x_w16(fe, 0x12, 0, 8, 0, 0, 6, val & 0x7F)		&&
 
-		// SetFilterBandwidth
+		/* SetFilterBandwidth */
 		tda2014x_w16(fe, 0xA, 0, 4, 0, 1, 6, 0xA)	&&
 		tda2014x_w16(fe, 0xB, 1, 7, 0, 1, 6, 0x7C)	&&
 
-		// SetGainConfig
+		/* SetGainConfig */
 		tda2014x_r8(fe, 6, 0, 8, &val)					&&
 		tda2014x_w16(fe, 6, 0, 8, 0, 0, 6, (val & 0x48) | 0b10100010)	&&
 		tda2014x_r8(fe, 9, 0, 8, &val)					&&
@@ -505,9 +507,8 @@ int tda2014x_probe(struct i2c_client *c, const struct i2c_device_id *id)
 	memcpy(&fe->ops.tuner_ops, &tda2014x_ops, sizeof(struct dvb_tuner_ops));
 	i2c_set_clientdata(c, t);
 	fe->dtv_property_cache.frequency = 1318000;
-dev_dbg(&c->dev, "%s ch %d", __func__, fe->id);
 
-	// SetPowerMode
+	/* SetPowerMode */
 	tda2014x_r8(fe, 2, 0, 8, &val)					&&
 	tda2014x_w16(fe, 2, 0, 8, 0, 0, 6, val | 0x81)			&&
 	tda2014x_r8(fe, 6, 0, 8, &val)					&&
@@ -548,14 +549,14 @@ dev_dbg(&c->dev, "%s ch %d", __func__, fe->id);
 	tda2014x_r8(fe, 0x14, 0, 8, &val)				&&
 	tda2014x_w16(fe, 0x14, 0, 8, 0, 0, 6, (val | 0x20) & 0xEF)	&&
 
-	// ProgramPllPor
+	/* ProgramPllPor */
 	tda2014x_w16(fe, 0x1A, 6, 1, 0, 1, 6, 1)	&&
 	tda2014x_w16(fe, 0x18, 0, 1, 0, 1, 6, 1)	&&
 	tda2014x_w16(fe, 0x18, 7, 1, 0, 1, 6, 1)	&&
 	tda2014x_w16(fe, 0x1B, 7, 1, 0, 1, 6, 1)	&&
 	tda2014x_w16(fe, 0x18, 0, 1, 0, 1, 6, 0)	&&
 
-	// ProgramVcoPor
+	/* ProgramVcoPor */
 	tda2014x_r8(fe, 0xF, 0, 8, &val)						&&
 	(val = (val & 0x1F) | 0x80, tda2014x_w16(fe, 0xF, 0, 8, 0, 0, 6, val))		&&
 	tda2014x_r8(fe, 0x13, 0, 8, &val)						&&
@@ -577,7 +578,7 @@ dev_dbg(&c->dev, "%s ch %d", __func__, fe->id);
 	(val &= 0x7F, tda2014x_w16(fe, 0x12, 0, 8, 0, 0, 6, val))	&&
 	tda2014x_w16(fe, 0xD, 5, 2, 0, 1, 6, 1)				&&
 
-	// EnableLoopThrough
+	/* EnableLoopThrough */
 	tda2014x_r8(fe, 6, 0, 8, &val)			&&
 	tda2014x_w16(fe, 6, 0, 8, 0, 0, 6, (val & 0xF7) | 8);
 
@@ -596,9 +597,8 @@ static struct i2c_driver tda2014x_driver = {
 	.remove		= tda2014x_remove,
 	.id_table	= tda2014x_id,
 };
-//module_i2c_driver(tda2014x_driver);
+/*module_i2c_driver(tda2014x_driver); */
 
-/////////////////////////////////////////////////////
 #include "nm131.h"
 
 struct nm131 {
@@ -732,7 +732,7 @@ int nm131_tune(struct dvb_frontend *fe)
 	nm131_w(fe, 0x37, lofreq < 155000000 ? 0x84 : lofreq < 300000000 ? 0x9C : 0x84, 1);
 	clk_off_f = (clk_off_f << 9) / v14 - 110592000;
 
-	// demod_config
+	/* demod_config */
 	nm131_w(fe, 0x164, tune_rf < 300000000 ? 0x600 : 0x500, 4);
 	rf = clk_off_f / 6750 + 16384;
 	nm131_w(fe, 0x230, (adec_ddfs_fq << 15) / rf | 0x80000, 4);
@@ -796,7 +796,10 @@ int nm131_probe(struct i2c_client *c, const struct i2c_device_id *id)
 	struct tnr_bb_reg_t {
 		u16 slvadr;
 		u32 val;
-	} const tnr_bb_defaults_lut[2] = {{356, 2048}, {448, 764156359}};
+	}
+	const tnr_bb_defaults_lut[2] = {
+		{356, 2048},	{448, 764156359}
+	};
 	u8			i;
 	struct nm131		*t	= kzalloc(sizeof(struct nm131), GFP_KERNEL);
 	struct dvb_frontend	*fe	= c->dev.platform_data;
@@ -809,16 +812,15 @@ int nm131_probe(struct i2c_client *c, const struct i2c_device_id *id)
 	memcpy(&fe->ops.tuner_ops, &nm131_ops, sizeof(struct dvb_tuner_ops));
 	i2c_set_clientdata(c, t);
 
-dev_dbg(&c->dev, "%s ch %d", __func__, fe->id);
 	for (i = 0; i < ARRAY_SIZE(tnr_rf_defaults_lut); i++)
 		nm131_w(fe, tnr_rf_defaults_lut[i].slvadr, tnr_rf_defaults_lut[i].val, 1);
 	nm131_r(fe, 0x36, &i, 1);
-	nm131_w(fe, 0x36, i & 0x7F, 1);	// no LDO bypass
+	nm131_w(fe, 0x36, i & 0x7F, 1);	/* no LDO bypass */
 	nm131_w(fe, tnr_bb_defaults_lut[0].slvadr, tnr_bb_defaults_lut[0].val, 4);
 	nm131_w(fe, tnr_bb_defaults_lut[1].slvadr, tnr_bb_defaults_lut[1].val, 4);
 	for (i = 0; i < ARRAY_SIZE(nm120_rf_defaults_lut); i++)
 		nm131_w(fe, nm120_rf_defaults_lut[i].slvadr, nm120_rf_defaults_lut[i].val, 1);
-	nm131_w(fe, 0xA, 0xFB, 1);	// ltgain
+	nm131_w(fe, 0xA, 0xFB, 1);	/* ltgain */
 	return 0;
 }
 
@@ -834,9 +836,8 @@ static struct i2c_driver nm131_driver = {
 	.remove		= nm131_remove,
 	.id_table	= nm131_id,
 };
-//module_i2c_driver(nm131_driver);
+/*module_i2c_driver(nm131_driver); */
 
-/////////////////////////////////////////////////////
 
 struct tc90522 {
 	struct dvb_frontend *fe;
@@ -867,14 +868,15 @@ bool tc90522_i2c_w_tuner(struct dvb_frontend *fe, u8 slvadr, u8 dat)
 
 bool tc90522_chk_lock(struct dvb_frontend *fe)
 {
-	u8 tc90522_get_quality(void) {
+	u8 tc90522_get_quality(void)
+	{
 		u8	byte1,
 			byte2,
 			Data;
 		u32	BerReg,
 			BER	= 0xFFFFFFFF;
 
-		if (fe->dtv_property_cache.delivery_system == SYS_ISDBS) {	// PSK
+		if (fe->dtv_property_cache.delivery_system == SYS_ISDBS) {	/* PSK */
 			if (tc90522_i2c_r_1(fe, 0xC3, &Data)
 				&& !(Data & 0x10)
 				&& tc90522_i2c_r_1(fe, 0xEB, &Data)) {
@@ -922,12 +924,11 @@ bool tc90522_chk_lock(struct dvb_frontend *fe)
 	u8	d0 = 0,
 		d1 = 0;
 
-	lock =	fe->dtv_property_cache.delivery_system == SYS_ISDBS				?
-		(tc90522_i2c_r_1(fe, 0xC3, &d0), !(d0 & 0x10))	&&	// sat
+	lock =	fe->dtv_property_cache.delivery_system == SYS_ISDBS	?
+		(tc90522_i2c_r_1(fe, 0xC3, &d0), !(d0 & 0x10))	&&	/* sat */
 		tc90522_get_quality() > 9			:
-		(tc90522_i2c_r_1(fe, 0x80, &d0), (d0 & 8) == 0)	&&	// ter
+		(tc90522_i2c_r_1(fe, 0x80, &d0), (d0 & 8) == 0)	&&	/* ter */
 		(tc90522_i2c_r_1(fe, 0xB0, &d1), (d1 & 0xF) > 7);
-//dev_dbg(&card->pdev->dev, "%s d0 %X d1 %X lock %d", __func__, d0, d1, lock);
 	return lock;
 }
 
@@ -946,7 +947,7 @@ u32 tc90522_get_cn(struct dvb_frontend *fe)
 		(i2c_transfer(d->i2c, msg + 1, 1) == 1 ? (cn[0] << 16) | (cn[1] << 8) | cn[2] : 0);
 }
 
-bool tc90522_gpio_w_2(struct pxq3pe_card *card, u8 Data, u8 mask)
+bool pxq3pe_w_gpio2(struct pxq3pe_card *card, u8 dat, u8 mask)
 {
 	u8	val;
 	struct i2c_msg msg[] = {
@@ -955,19 +956,19 @@ bool tc90522_gpio_w_2(struct pxq3pe_card *card, u8 Data, u8 mask)
 	};
 
 	return	i2c_transfer(&card->i2c, msg, 1) == 1	&&
-		(val = (mask & Data) | (val & ~mask), i2c_transfer(&card->i2c, msg + 1, 1) == 1);
+		(val = (mask & dat) | (val & ~mask), i2c_transfer(&card->i2c, msg + 1, 1) == 1);
 }
 
-void tc90522_gpio_w_1(struct pxq3pe_card *card, u8 val, u8 mask)
+void pxq3pe_w_gpio1(struct pxq3pe_card *card, u8 dat, u8 mask)
 {
 	mask <<= 3;
-	writeb((readb(card->bar + 0x890) & ~mask) | ((val << 3) & mask), card->bar + 0x890);
+	writeb((readb(card->bar + 0x890) & ~mask) | ((dat << 3) & mask), card->bar + 0x890);
 }
 
-void tc90522_gpio_w_0(struct pxq3pe_card *card, u8 val, u8 mask)
+void pxq3pe_w_gpio0(struct pxq3pe_card *card, u8 dat, u8 mask)
 {
-	writeb((-(mask & 1) & 4 & -(val & 1)) | (readb(card->bar + 0x890) & ~(-(mask & 1) & 4)), card->bar + 0x890);
-	writeb((mask & val) | (readb(card->bar + 0x894) & ~mask), card->bar + 0x894);
+	writeb((-(mask & 1) & 4 & -(dat & 1)) | (readb(card->bar + 0x890) & ~(-(mask & 1) & 4)), card->bar + 0x890);
+	writeb((mask & dat) | (readb(card->bar + 0x894) & ~mask), card->bar + 0x894);
 }
 
 void tc90522_lnb(struct pxq3pe_card *card)
@@ -981,30 +982,29 @@ void tc90522_lnb(struct pxq3pe_card *card)
 			break;
 		}
 	if (card->lnb != lnb) {
-		tc90522_gpio_w_2(card, lnb ? 0x20 : 0, 0x20);
+		pxq3pe_w_gpio2(card, lnb ? 0x20 : 0, 0x20);
 		card->lnb = lnb;
-dev_dbg(&card->pdev->dev, "%s %d", __func__, lnb);
 	}
 }
 
 void tc90522_power(struct pxq3pe_card *card, bool bON)
 {
 	if (bON) {
-		tc90522_gpio_w_0(card, 1, 1);
-		tc90522_gpio_w_0(card, 0, 1);
-		tc90522_gpio_w_0(card, 1, 1);
-		tc90522_gpio_w_1(card, 1, 1);
-		tc90522_gpio_w_1(card, 0, 1);
-		tc90522_gpio_w_2(card, 2, 2);
-		tc90522_gpio_w_2(card, 0, 2);
-		tc90522_gpio_w_2(card, 2, 2);
-		tc90522_gpio_w_2(card, 4, 4);
-		tc90522_gpio_w_2(card, 0, 4);
-		tc90522_gpio_w_2(card, 4, 4);
+		pxq3pe_w_gpio0(card, 1, 1);
+		pxq3pe_w_gpio0(card, 0, 1);
+		pxq3pe_w_gpio0(card, 1, 1);
+		pxq3pe_w_gpio1(card, 1, 1);
+		pxq3pe_w_gpio1(card, 0, 1);
+		pxq3pe_w_gpio2(card, 2, 2);
+		pxq3pe_w_gpio2(card, 0, 2);
+		pxq3pe_w_gpio2(card, 2, 2);
+		pxq3pe_w_gpio2(card, 4, 4);
+		pxq3pe_w_gpio2(card, 0, 4);
+		pxq3pe_w_gpio2(card, 4, 4);
 	} else {
-		tc90522_gpio_w_0(card, 0, 1);
-		tc90522_gpio_w_0(card, 1, 1);
-		tc90522_gpio_w_1(card, 1, 1);
+		pxq3pe_w_gpio0(card, 0, 1);
+		pxq3pe_w_gpio0(card, 1, 1);
+		pxq3pe_w_gpio1(card, 1, 1);
 	}
 }
 
@@ -1028,7 +1028,7 @@ int tc90522_probe(struct i2c_client *c, const struct i2c_device_id *id)
 	i2c_set_clientdata(c, d);
 
 	fe->id & 1				?
-	tc90522_i2c_w_tuner(fe, 0x13, 0)	&&	// sat
+	tc90522_i2c_w_tuner(fe, 0x13, 0)	&&	/* sat */
 	tc90522_i2c_w_tuner(fe, 0x15, 0)	&&
 	tc90522_i2c_w_tuner(fe, 0x17, 0)	&&
 	tc90522_i2c_w_tuner(fe, 0x1C, 0)	&&
@@ -1037,7 +1037,7 @@ int tc90522_probe(struct i2c_client *c, const struct i2c_device_id *id)
 	(tc90522_i2c_w_tuner(fe, 7, 0x31)	,
 	tc90522_i2c_w_tuner(fe, 8, 0x77)	,
 	tc90522_i2c_w_tuner(fe, 4, 2))		:
-	tc90522_i2c_w_tuner(fe, 0xB0, 0xA0)	&&	// ter
+	tc90522_i2c_w_tuner(fe, 0xB0, 0xA0)	&&	/* ter */
 	tc90522_i2c_w_tuner(fe, 0xB2, 0x3D)	&&
 	tc90522_i2c_w_tuner(fe, 0xB3, 0x25)	&&
 	tc90522_i2c_w_tuner(fe, 0xB4, 0x8B)	&&
@@ -1051,16 +1051,7 @@ int tc90522_probe(struct i2c_client *c, const struct i2c_device_id *id)
 	(tc90522_i2c_w_tuner(fe, 0xE, 0x77)	,
 	tc90522_i2c_w_tuner(fe, 0xF, 0x13)	,
 	tc90522_i2c_w_tuner(fe, 0x75, 2));
-/*
-	memcpy(&fe->ops, (fe->dtv_property_cache.delivery_system == SYS_ISDBS) ?
-		&tc90522_ops_s : &tc90522_ops_t, sizeof(struct dvb_frontend_ops));
-	if (cfg->pwr && (tc90522_set_powers(demod, TC90522_PWR_TUNER_ON)	||
-			i2c_transfer(demod->i2c, NULL, 0)			||
-			tc90522_set_powers(demod, TC90522_PWR_TUNER_ON | TC90522_PWR_AMP_ON))) {
-		tc90522_release(fe);
-		return -EIO;
-	}
-*/
+
 	return 0;
 }
 
@@ -1076,9 +1067,8 @@ static struct i2c_driver tc90522_driver = {
 	.remove		= tc90522_remove,
 	.id_table	= tc90522_id,
 };
-//module_i2c_driver(tc90522_driver);
+/*module_i2c_driver(tc90522_driver); */
 
-/////////////////////////////////////////////////////
 
 bool pxq3pe_tune(struct pxq3pe_adap *p, int fno, int slot)
 {
@@ -1102,7 +1092,7 @@ bool pxq3pe_tune(struct pxq3pe_adap *p, int fno, int slot)
 		tc90522_i2c_w_tuner(fe, 0x10, 0xB2)	&&
 		tc90522_i2c_w_tuner(fe, 0x11, 0)	&&
 		tc90522_i2c_w_tuner(fe, 3, 1);
-		msleep(150);	// min 150ms
+		msleep(150);	/* min 150ms */
 		for (slvadr = 0xCE, i = 0; slvadr < 0xDE && i < ARRAY_SIZE(tsid); slvadr += 2, i++) {
 			if (!tc90522_i2c_r_1(fe, slvadr, &tsid_hi) || !tc90522_i2c_r_1(fe, slvadr + 1, &tsid_lo))
 				break;
@@ -1209,17 +1199,17 @@ bool pxq3pe_dma_start(struct pxq3pe_adap *p)
 	if (card->dma.ON[port])
 		return true;
 
-	// SetTSMode
+	/* SetTSMode */
 	i = readb(card->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_TSMODE);
 	if ((i & 0x80) == 0)
 		writeb(i | 0x80, card->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_TSMODE);
 
-	// irq_enable
+	/* irq_enable */
 	writel(val, card->bar + PXQ3PE_INT_ENABLE);
 	if (val != (readl(card->bar + PXQ3PE_INT_ACTIVE) & val))
 		return false;
 
-	// cfg_dma
+	/* cfg_dma */
 	for (i = 0; i < 2; i++) {
 		val = readl(		card->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
 		writel(card->dma.adr + PKT_BUFLEN * (port * 2 + i),
@@ -1244,7 +1234,7 @@ void pxq3pe_dma_stop(struct pxq3pe_adap *p)
 		if (!card->dma.ON[port] || (i2cadr != i && (i & 4) == (i2cadr & 4) && card->dma.ON[port]))
 			return;
 
-	// cancel_dma
+	/* cancel_dma */
 	i = readb(card->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
 	if ((i & 0b1100) == 4)
 		writeb(i & 0xFD, card->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
@@ -1389,12 +1379,12 @@ void pxq3pe_remove(struct pci_dev *pdev)
 		cdev_del(&card->adap[i].cdev);
 		device_destroy(pxq3pe_class, MKDEV(MAJOR(card->dev), MINOR(card->dev) + i));
 	}
-	pxq3pe_i2c_w(card, PXQ3PE_I2C_ADR_GPIO, 0x80, &WtEncCtlReg, 1, PTX_MODE_GPIO);
+	pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x80, &WtEncCtlReg, 1, PXQ3PE_MOD_GPIO);
 	tc90522_lnb(card);
 	tc90522_power(card, false);
 	unregister_chrdev_region(card->dev, card->adapn);
 
-	// dma_hw_unmap
+	/* dma_hw_unmap */
 	free_irq(pdev->irq, card);
 	if (card->dma.dat) {
 		if (!(ops = pdev->dev.archdata.dma_ops))
@@ -1405,8 +1395,6 @@ void pxq3pe_remove(struct pci_dev *pdev)
 	for (i = 0; card->adap && i < card->adapn; i++) {
 		struct pxq3pe_adap	*p	= &card->adap[i];
 
-///		ptx_unregister_subdev(p->tuner);
-///		ptx_unregister_subdev(p->demod);
 		if (p->tuner) {
 			if (i & 1)
 				tda2014x_driver.remove(p->tuner);
@@ -1522,7 +1510,7 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 	if (i < card->adapn)
 		return ptx_abort(pdev, pxq3pe_remove, -ENOMEM, "No memory for stream buffer");
 
-	// dma_map
+	/* dma_map */
 	card->dma.sz = PKT_BUFLEN * 4;
 	if (request_irq(pdev->irq, pxq3pe_irq, IRQF_SHARED, KBUILD_MODNAME, card))
 		return ptx_abort(pdev, pxq3pe_remove, -EIO, "IRQ failed");
@@ -1541,11 +1529,12 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 			if (!(gfp & 1))
 				gfp |= 4;
 		card->dma.dat = ops->alloc(dev, card->dma.sz, &card->dma.adr, gfp, NULL);
+dev_dbg(&card->pdev->dev, "%s gfp 0x%llx", __func__, gfp);
 	}
 	if (!card->dma.dat)
 		return ptx_abort(pdev, pxq3pe_remove, -EIO, "DMA mapping failed");
 
-	// hw_init
+	/* hw_init */
 	writeb(readb(card->bar + 0x880) & 0xC0, card->bar + 0x880);
 	writel(0x3200C8, card->bar + 0x904);
 	writel(0x90, card->bar + 0x900);
@@ -1558,17 +1547,17 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 	writel(0x1004, card->bar + 0x0890);
 	writel(0x0090, card->bar + 0x0900);
 	writel(0x3200C8, card->bar + 0x0904);
-	tc90522_gpio_w_0(card, 8, 0xFF);
-	tc90522_gpio_w_1(card, 0, 2);
-	tc90522_gpio_w_1(card, 1, 1);
-	tc90522_gpio_w_0(card, 1, 1);
-	tc90522_gpio_w_0(card, 0, 1);
-	tc90522_gpio_w_0(card, 1, 1);
+	pxq3pe_w_gpio0(card, 8, 0xFF);
+	pxq3pe_w_gpio1(card, 0, 2);
+	pxq3pe_w_gpio1(card, 1, 1);
+	pxq3pe_w_gpio0(card, 1, 1);
+	pxq3pe_w_gpio0(card, 0, 1);
+	pxq3pe_w_gpio0(card, 1, 1);
 	for (i = 0; i < 16; i++)
-		if (!pxq3pe_i2c_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, MOD_AUTH + i, 1, PTX_MODE_GPIO))
+		if (!pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, MOD_AUTH + i, 1, PXQ3PE_MOD_GPIO))
 			break;
 	v8 = 0xA0;
-	if (i < 16 || !pxq3pe_i2c_w(card, PXQ3PE_I2C_ADR_GPIO, 5, &v8, 1, PTX_MODE_GPIO))
+	if (i < 16 || !pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 5, &v8, 1, PXQ3PE_MOD_GPIO))
 		return ptx_abort(pdev, pxq3pe_remove, -EIO, "pxq3pe_hw_init failed");
 
 	tc90522_power(card, true);
@@ -1577,17 +1566,16 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 		struct i2c_board_info	info	= {};
 
 		info.platform_data	= &p->fe;
-		info.addr		= PXQ3PE_I2C_ADR_GPIO;	// should not be zero!
+		info.addr		= PXQ3PE_I2C_ADR_GPIO;	/* should not be zero! */
 		strlcpy(info.type, TC90522_MODNAME, I2C_NAME_SIZE);
-///		p->demod = ptx_register_subdev(i2c, &info);
-		p->demod = kzalloc(sizeof(struct i2c_client), GFP_KERNEL);	// fix this
+		p->demod = kzalloc(sizeof(struct i2c_client), GFP_KERNEL);
 		if (!p->demod)
 			return ptx_abort(pdev, pxq3pe_remove, -ENODEV, "#%d Cannot register I2C demod", i);
 		p->demod->dev.platform_data	= &p->fe;
 		p->demod->adapter		= i2c;
 		tc90522_driver.probe(p->demod, NULL);
 
-		p->tuner = kzalloc(sizeof(struct i2c_client), GFP_KERNEL);	// fix this
+		p->tuner = kzalloc(sizeof(struct i2c_client), GFP_KERNEL);
 		if (!p->tuner)
 			return ptx_abort(pdev, pxq3pe_remove, -ENODEV, "#%d Cannot register I2C tuner", i);
 		p->tuner->dev.platform_data	= &p->fe;

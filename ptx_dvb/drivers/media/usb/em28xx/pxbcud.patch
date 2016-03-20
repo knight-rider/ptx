@@ -1,0 +1,226 @@
+diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/Kconfig drivers/media/usb/em28xx/Kconfig
+--- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/Kconfig	2015-06-22 14:05:43.000000000 +0900
++++ drivers/media/usb/em28xx/Kconfig	2016-03-16 02:42:57.000000000 +0900
+@@ -59,6 +59,8 @@
+ 	select DVB_DRX39XYJ if MEDIA_SUBDRV_AUTOSELECT
+ 	select DVB_SI2168 if MEDIA_SUBDRV_AUTOSELECT
+ 	select MEDIA_TUNER_SI2157 if MEDIA_SUBDRV_AUTOSELECT
++	select DVB_TC90522 if MEDIA_SUBDRV_AUTOSELECT
++	select MEDIA_TUNER_QM1D1C004X if MEDIA_SUBDRV_AUTOSELECT
+ 	---help---
+ 	  This adds support for DVB cards based on the
+ 	  Empiatech em28xx chips.
+diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-cards.c drivers/media/usb/em28xx/em28xx-cards.c
+--- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-cards.c	2015-06-22 14:05:43.000000000 +0900
++++ drivers/media/usb/em28xx/em28xx-cards.c	2016-03-16 02:48:24.000000000 +0900
+@@ -491,6 +491,20 @@
+ 	{-1,                             -1,   -1,     -1},
+ };
+ 
++static struct em28xx_reg_seq plex_px_bcud[] = {
++	{EM2874_R80_GPIO_P0_CTRL,	0xff,	0xff,	0},
++	{0x0d,				0xff,	0xff,	0},
++	{EM2874_R50_IR_CONFIG,		0x01,	0xff,	0},
++	{EM28XX_R06_I2C_CLK,		0x40,	0xff,	0},
++	{EM2874_R80_GPIO_P0_CTRL,	0xfd,	0xff,	100},
++	{EM28XX_R12_VINENABLE,		0x20,	0x20,	0},
++	{0x0d,				0x42,	0xff,	1000},
++	{EM2874_R80_GPIO_P0_CTRL,	0xfc,	0xff,	10},
++	{EM2874_R80_GPIO_P0_CTRL,	0xfd,	0xff,	10},
++	{0x73,				0xfd,	0xff,	100},
++	{-1,				-1,	-1,	-1},
++};
++
+ /*
+  *  Button definitions
+  */
+@@ -2288,6 +2302,17 @@
+ 		.has_dvb       = 1,
+ 		.ir_codes      = RC_MAP_TERRATEC_SLIM_2,
+ 	},
++	/* 3275:0085 PLEX PX-BCUD.
++	 * Empia EM28178, TOSHIBA TC90532XBG, Sharp QM1D1C0042 */
++	[EM28178_BOARD_PLEX_PX_BCUD] = {
++		.name          = "PLEX PX-BCUD",
++		.xclk          = EM28XX_XCLK_FREQUENCY_4_3MHZ,
++		.def_i2c_bus   = 1,
++		.i2c_speed     = EM28XX_I2C_CLK_WAIT_ENABLE,
++		.tuner_type    = TUNER_ABSENT,
++		.tuner_gpio    = plex_px_bcud,
++		.has_dvb       = 1,
++	},
+ };
+ EXPORT_SYMBOL_GPL(em28xx_boards);
+ 
+@@ -2475,6 +2500,8 @@
+ 			.driver_info = EM2861_BOARD_LEADTEK_VC100 },
+ 	{ USB_DEVICE(0xeb1a, 0x8179),
+ 			.driver_info = EM28178_BOARD_TERRATEC_T2_STICK_HD },
++	{ USB_DEVICE(0x3275, 0x0085),
++			.driver_info = EM28178_BOARD_PLEX_PX_BCUD },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(usb, em28xx_id_table);
+diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c drivers/media/usb/em28xx/em28xx-dvb.c
+--- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c	2015-06-22 14:05:43.000000000 +0900
++++ drivers/media/usb/em28xx/em28xx-dvb.c	2016-03-16 19:24:04.000000000 +0900
+@@ -12,6 +12,12 @@
+ 
+  (c) 2012 Frank Schäfer <fschaefer.oss@googlemail.com>
+ 
++ (c) 2016 Satoshi Nagahama <sattnag@aim.com>
++	- PLEX PX-BCUD support
++
++ (c) 2016 Budi Rachmanto, AreMa Inc. <info@are.ma>
++	- Fixes for dvb_frontend registration
++
+  Based on cx88-dvb, saa7134-dvb and videobuf-dvb originally written by:
+ 	(c) 2004, 2005 Chris Pascoe <c.pascoe@itee.uq.edu.au>
+ 	(c) 2004 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
+@@ -25,11 +31,10 @@
+ #include <linux/slab.h>
+ #include <linux/usb.h>
+ 
++#include "ptx_common.h"
+ #include "em28xx.h"
+ #include <media/v4l2-common.h>
+-#include <dvb_demux.h>
+ #include <dvb_net.h>
+-#include <dmxdev.h>
+ #include <media/tuner.h>
+ #include "tuner-simple.h"
+ #include <linux/gpio.h>
+@@ -57,6 +62,8 @@
+ #include "ts2020.h"
+ #include "si2168.h"
+ #include "si2157.h"
++#include "tc90522.h"
++#include "qm1d1c004x.h"
+ 
+ MODULE_AUTHOR("Mauro Carvalho Chehab <mchehab@infradead.org>");
+ MODULE_LICENSE("GPL");
+@@ -785,6 +792,65 @@
+ 	return 0;
+ }
+ 
++static void px_bcud_init(struct em28xx *dev)
++{
++	int i;
++	struct {
++		unsigned char r[4];
++		int len;
++	} regs1[] = {
++		{{ 0x0e, 0x77 }, 2},
++		{{ 0x0f, 0x77 }, 2},
++		{{ 0x03, 0x90 }, 2},
++	}, regs2[] = {
++		{{ 0x07, 0x01 }, 2},
++		{{ 0x08, 0x10 }, 2},
++		{{ 0x13, 0x00 }, 2},
++		{{ 0x17, 0x00 }, 2},
++		{{ 0x03, 0x01 }, 2},
++		{{ 0x10, 0xb1 }, 2},
++		{{ 0x11, 0x40 }, 2},
++		{{ 0x85, 0x7a }, 2},
++		{{ 0x87, 0x04 }, 2},
++	};
++	static struct em28xx_reg_seq gpio[] = {
++		{EM28XX_R06_I2C_CLK,		0x40,	0xff,	300},
++		{EM2874_R80_GPIO_P0_CTRL,	0xfd,	0xff,	60},
++		{EM28XX_R15_RGAIN,		0x20,	0xff,	0},
++		{EM28XX_R16_GGAIN,		0x20,	0xff,	0},
++		{EM28XX_R17_BGAIN,		0x20,	0xff,	0},
++		{EM28XX_R18_ROFFSET,		0x00,	0xff,	0},
++		{EM28XX_R19_GOFFSET,		0x00,	0xff,	0},
++		{EM28XX_R1A_BOFFSET,		0x00,	0xff,	0},
++		{EM28XX_R23_UOFFSET,		0x00,	0xff,	0},
++		{EM28XX_R24_VOFFSET,		0x00,	0xff,	0},
++		{EM28XX_R26_COMPR,		0x00,	0xff,	0},
++		{0x13,				0x08,	0xff,	0},
++		{EM28XX_R12_VINENABLE,		0x27,	0xff,	0},
++		{EM28XX_R0C_USBSUSP,		0x10,	0xff,	0},
++		{EM28XX_R27_OUTFMT,		0x00,	0xff,	0},
++		{EM28XX_R10_VINMODE,		0x00,	0xff,	0},
++		{EM28XX_R11_VINCTRL,		0x11,	0xff,	0},
++		{EM2874_R50_IR_CONFIG,		0x01,	0xff,	0},
++		{EM2874_R5F_TS_ENABLE,		0x80,	0xff,	0},
++		{EM28XX_R06_I2C_CLK,		0x46,	0xff,	0},
++	};
++	em28xx_write_reg(dev, EM28XX_R06_I2C_CLK, 0x46);
++	/* sleeping ISDB-T */
++	dev->dvb->i2c_client_demod->addr = 0x14;
++	for (i = 0; i < ARRAY_SIZE(regs1); i++)
++		i2c_master_send(dev->dvb->i2c_client_demod, regs1[i].r, regs1[i].len);
++	/* sleeping ISDB-S */
++	dev->dvb->i2c_client_demod->addr = 0x15;
++	for (i = 0; i < ARRAY_SIZE(regs2); i++)
++		i2c_master_send(dev->dvb->i2c_client_demod, regs2[i].r, regs2[i].len);
++	for (i = 0; i < ARRAY_SIZE(gpio); i++) {
++		em28xx_write_reg_bits(dev, gpio[i].reg, gpio[i].val, gpio[i].mask);
++		if (gpio[i].sleep > 0)
++			msleep(gpio[i].sleep);
++	}
++};
++
+ static struct mt352_config terratec_xs_mt352_cfg = {
+ 	.demod_address = (0x1e >> 1),
+ 	.no_tuner = 1,
+@@ -1561,7 +1627,7 @@
+ 			strlcpy(info.type, "si2168", I2C_NAME_SIZE);
+ 			info.addr = 0x64;
+ 			info.platform_data = &si2168_config;
+-			request_module(info.type);
++			request_module("%s", info.type);
+ 			client = i2c_new_device(&dev->i2c_adap[dev->def_i2c_bus], &info);
+ 			if (client == NULL || client->dev.driver == NULL) {
+ 				result = -ENODEV;
+@@ -1583,7 +1649,7 @@
+ 			strlcpy(info.type, "si2157", I2C_NAME_SIZE);
+ 			info.addr = 0x60;
+ 			info.platform_data = &si2157_config;
+-			request_module(info.type);
++			request_module("%s", info.type);
+ 			client = i2c_new_device(adapter, &info);
+ 			if (client == NULL || client->dev.driver == NULL) {
+ 				module_put(dvb->i2c_client_demod->dev.driver->owner);
+@@ -1621,7 +1687,7 @@
+ 			strlcpy(info.type, "si2168", I2C_NAME_SIZE);
+ 			info.addr = 0x64;
+ 			info.platform_data = &si2168_config;
+-			request_module(info.type);
++			request_module("%s", info.type);
+ 			client = i2c_new_device(&dev->i2c_adap[dev->def_i2c_bus], &info);
+ 			if (client == NULL || client->dev.driver == NULL) {
+ 				result = -ENODEV;
+@@ -1663,6 +1729,19 @@
+ 			dvb->i2c_client_tuner = client;
+ 		}
+ 		break;
++	case EM28178_BOARD_PLEX_PX_BCUD:
++		{
++			struct ptx_subdev_info	pxbcud_subdev_info =
++				{SYS_ISDBS, 0x15, TC90522_MODNAME, 0x61, QM1D1C004X_MODNAME};
++
++			dvb->fe[0] = ptx_register_fe(&dev->i2c_adap[dev->def_i2c_bus], NULL, &pxbcud_subdev_info);
++			if (!dvb->fe[0])
++                                goto out_free;
++			dvb->i2c_client_demod = dvb->fe[0]->demodulator_priv;
++                        dvb->i2c_client_tuner = dvb->fe[0]->tuner_priv;
++			px_bcud_init(dev);
++		}
++		break;
+ 	default:
+ 		em28xx_errdev("/2: The frontend of your DVB/ATSC card"
+ 				" isn't supported yet\n");
+diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx.h drivers/media/usb/em28xx/em28xx.h
+--- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx.h	2015-06-22 14:05:43.000000000 +0900
++++ drivers/media/usb/em28xx/em28xx.h	2016-03-16 02:42:57.000000000 +0900
+@@ -144,6 +144,7 @@
+ #define EM2861_BOARD_LEADTEK_VC100                95
+ #define EM28178_BOARD_TERRATEC_T2_STICK_HD        96
+ #define EM2884_BOARD_ELGATO_EYETV_HYBRID_2008     97
++#define EM28178_BOARD_PLEX_PX_BCUD                98
+ 
+ /* Limits minimum and default number of buffers */
+ #define EM28XX_MIN_BUF 4
+

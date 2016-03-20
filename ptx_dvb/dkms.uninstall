@@ -7,5 +7,6 @@ dkms remove -m $PACKAGE_NAME -v $PACKAGE_VERSION --all;
 make uninstall;
 rm -vrf /usr/src/$PACKAGE_NAME-$PACKAGE_VERSION"
 
-find /lib/modules -type d -path "*pci/pt*" -exec rm -vrf {} \;
+find /lib/modules -type d -path "*pci/pt3" -exec rm -vrf {} \;
+find /lib/modules -type f -name "qm1d1c0042*" -exec rm -vrf {} \;
 

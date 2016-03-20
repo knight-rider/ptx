@@ -10,11 +10,7 @@
  *	NM120		- ISDB-T tuner
  */
 
-#include <linux/pci.h>
 #include <linux/interrupt.h>
-#include <linux/kthread.h>
-#include <linux/freezer.h>
-#include "dvb_frontend.h"
 #include "ptx_common.h"
 #include "tc90522.h"
 #include "tda2014x.h"
@@ -28,8 +24,8 @@ MODULE_LICENSE("GPL");
 static char	*auth	= MOD_AUTH;
 static int	ni,
 		nx,
-		idx[8]	= {0},
-		xor[4]	= {0};
+		idx[8]	= {},
+		xor[4]	= {};
 module_param(auth, charp, 0);
 module_param_array(idx, int, &ni, 0);
 module_param_array(xor, int, &nx, 0);
@@ -44,6 +40,10 @@ enum ePXQ3PE {
 	PKT_BYTES	= 188,
 	PKT_NUM		= 312,
 	PKT_BUFSZ	= PKT_BYTES * PKT_NUM,
+
+	PXQ3PE_MOD_GPIO		= 0,
+	PXQ3PE_MOD_TUNER	= 1,
+	PXQ3PE_MOD_STAT		= 2,
 
 	PXQ3PE_IRQ_STAT		= 0x808,
 	PXQ3PE_IRQ_CLEAR	= 0x80C,
@@ -67,7 +67,7 @@ enum ePXQ3PE {
 	PXQ3PE_DMA_XFR_STAT	= 0xAC8,
 	PXQ3PE_DMA_CTL		= 0xACC,
 
-	PXQ3PE_MAX_LOOP		= 0xFFFF,
+	PXQ3PE_MAX_LOOP		= 1000,
 };
 
 struct pxq3pe_card {
@@ -90,6 +90,25 @@ struct pxq3pe_adap {
 		sBufByteCnt;
 };
 
+bool pxq3pe_i2c_clean(struct ptx_card *card)
+{
+	struct pxq3pe_card	*c	= card->priv;
+	void __iomem		*bar	= c->bar;
+
+	if ((readl(bar + PXQ3PE_I2C_FIFO_STAT) & 0x1F) != 0x10 || readl(bar + PXQ3PE_I2C_FIFO_STAT) & 0x1F00) {
+		u32 stat = readl(bar + PXQ3PE_I2C_SW_CTL) | 0x20;
+
+		writel(stat, bar + PXQ3PE_I2C_SW_CTL);
+		writel(stat & 0xFFFFFFDF, bar + PXQ3PE_I2C_SW_CTL);
+		if ((readl(bar + PXQ3PE_I2C_FIFO_STAT) & 0x1F) != 0x10) {
+			dev_err(&card->pdev->dev, "%s FIFO error", __func__);
+			return false;
+		}
+	}
+	writel(0, bar + PXQ3PE_I2C_CTL_STAT);
+	return true;
+}
+
 bool pxq3pe_w(struct ptx_card *card, u8 slvadr, u8 regadr, u8 *wdat, u8 bytelen, u8 mode)
 {
 	struct pxq3pe_card	*c	= card->priv;
@@ -100,20 +119,17 @@ bool pxq3pe_w(struct ptx_card *card, u8 slvadr, u8 regadr, u8 *wdat, u8 bytelen,
 	u8	i2cCtlByte,
 		i2cFifoWSz;
 
-	if ((readl(bar + PXQ3PE_I2C_FIFO_STAT) & 0x1F) != 0x10 || readl(bar + PXQ3PE_I2C_FIFO_STAT) & 0x1F00)
+	if (!pxq3pe_i2c_clean(card))
 		return false;
-	writel(0, bar + PXQ3PE_I2C_CTL_STAT);
 	switch (mode) {
-	case PTX_MODE_GPIO:
+	case PXQ3PE_MOD_GPIO:
 		i2cCtlByte = 0xC0;
 		break;
-	case PTX_MODE_TUNER:
-		slvadr = 2 * slvadr + 0x20;
+	case PXQ3PE_MOD_TUNER:
 		regadr = 0;
 		i2cCtlByte = 0x80;
 		break;
-	case PTX_MODE_STAT:
-		slvadr = 2 * slvadr + 0x20;
+	case PXQ3PE_MOD_STAT:
 		regadr = 0;
 		i2cCtlByte = 0x84;
 		break;
@@ -161,15 +177,13 @@ bool pxq3pe_r(struct ptx_card *card, u8 slvadr, u8 regadr, u8 *rdat, u8 bytelen,
 		idx;
 	bool	ret		= false;
 
-	if ((readl(bar + PXQ3PE_I2C_FIFO_STAT) & 0x1F) != 0x10 || readl(bar + PXQ3PE_I2C_FIFO_STAT) & 0x1F00)
+	if (!pxq3pe_i2c_clean(card))
 		return false;
-	writel(0, bar + PXQ3PE_I2C_CTL_STAT);
 	switch (mode) {
-	case PTX_MODE_GPIO:
+	case PXQ3PE_MOD_GPIO:
 		i2cCtlByte = 0xE0;
 		break;
-	case PTX_MODE_TUNER:
-		slvadr = 2 * slvadr + 0x20;
+	case PXQ3PE_MOD_TUNER:
 		regadr = 0;
 		i2cCtlByte = 0xA0;
 		break;
@@ -226,9 +240,9 @@ int pxq3pe_xfr(struct i2c_adapter *i2c, struct i2c_msg *msg, int sz)
 	for (i = 0; i < sz && ret; i++, msg++) {
 		u8	slvadr	= msg->addr,
 			regadr	= msg->len ? *msg->buf : 0,
-			mode	= slvadr == PXQ3PE_I2C_ADR_GPIO	? PTX_MODE_GPIO
-				: sz > 1 && i == sz - 2		? PTX_MODE_STAT
-				: PTX_MODE_TUNER;
+			mode	= slvadr == PXQ3PE_I2C_ADR_GPIO	? PXQ3PE_MOD_GPIO
+				: sz > 1 && i == sz - 2		? PXQ3PE_MOD_STAT
+				: PXQ3PE_MOD_TUNER;
 
 		mutex_lock(&card->lock);
 		if (msg->flags & I2C_M_RD) {
@@ -247,24 +261,24 @@ bool pxq3pe_w_gpio2(struct ptx_card *card, u8 dat, u8 mask)
 {
 	u8 val;
 
-	return	pxq3pe_r(card, PXQ3PE_I2C_ADR_GPIO, 0xB, &val, 1, PTX_MODE_GPIO)	&&
-		(val = (mask & dat) | (val & ~mask), pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0xB, &val, 1, PTX_MODE_GPIO));
+	return	pxq3pe_r(card, PXQ3PE_I2C_ADR_GPIO, 0xB, &val, 1, PXQ3PE_MOD_GPIO)	&&
+		(val = (mask & dat) | (val & ~mask), pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0xB, &val, 1, PXQ3PE_MOD_GPIO));
 }
 
-void pxq3pe_w_gpio1(struct ptx_card *card, u8 val, u8 mask)
+void pxq3pe_w_gpio1(struct ptx_card *card, u8 dat, u8 mask)
 {
 	struct pxq3pe_card *c = card->priv;
 
 	mask <<= 3;
-	writeb((readb(c->bar + 0x890) & ~mask) | ((val << 3) & mask), c->bar + 0x890);
+	writeb((readb(c->bar + 0x890) & ~mask) | ((dat << 3) & mask), c->bar + 0x890);
 }
 
-void pxq3pe_w_gpio0(struct ptx_card *card, u8 val, u8 mask)
+void pxq3pe_w_gpio0(struct ptx_card *card, u8 dat, u8 mask)
 {
 	struct pxq3pe_card *c = card->priv;
 
-	writeb((-(mask & 1) & 4 & -(val & 1)) | (readb(c->bar + 0x890) & ~(-(mask & 1) & 4)), c->bar + 0x890);
-	writeb((mask & val) | (readb(c->bar + 0x894) & ~mask), c->bar + 0x894);
+	writeb((-(mask & 1) & 4 & -(dat & 1)) | (readb(c->bar + 0x890) & ~(-(mask & 1) & 4)), c->bar + 0x890);
+	writeb((mask & dat) | (readb(c->bar + 0x894) & ~mask), c->bar + 0x894);
 }
 
 void pxq3pe_power(struct ptx_card *card, bool ON)
@@ -295,9 +309,9 @@ irqreturn_t pxq3pe_irq(int irq, void *ctx)
 	void __iomem		*bar	= c->bar;
 	u32	dmamgmt,
 		i,
-		intstat = readl(bar + PXQ3PE_IRQ_STAT);
-	bool	ch	= intstat & 0b0101 ? 0 : 1,
-		port	= intstat & 0b0011 ? 0 : 1;
+		irqstat = readl(bar + PXQ3PE_IRQ_STAT);
+	bool	ch	= irqstat & 0b0101 ? 0 : 1,
+		port	= irqstat & 0b0011 ? 0 : 1;
 	u8	*tbuf	= c->dma.dat + PKT_BUFSZ * (port * 2 + ch);
 
 	void pxq3pe_dma_put_stream(struct pxq3pe_adap *p)
@@ -323,27 +337,27 @@ irqreturn_t pxq3pe_irq(int irq, void *ctx)
 		}
 	}
 
-	if (!(intstat & 0b1111))
+	if (!(irqstat & 0b1111))
 		return IRQ_HANDLED;
-	writel(intstat, bar + PXQ3PE_IRQ_CLEAR);
+	writel(irqstat, bar + PXQ3PE_IRQ_CLEAR);
 	dmamgmt = readl(bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
 	if ((readl(bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_OFFSET_CH * ch + PXQ3PE_DMA_XFR_STAT) & 0x3FFFFF) == PKT_BUFSZ)
 		for (i = 0; i < PKT_BUFSZ; i += PKT_BYTES) {
-		u8 i2cadr = !port * 4 + (tbuf[i] == 0xC7 ? 0 : tbuf[i] == 0x47 ?
+			u8 idx = !port * 4 + (tbuf[i] == 0xC7 ? 0 : tbuf[i] == 0x47 ?
 					1 : tbuf[i] == 0x07 ? 2 : tbuf[i] == 0x87 ? 3 : card->adapn);
-		struct ptx_adap		*adap	= &card->adap[i2cadr];
-		struct pxq3pe_adap	*p	= adap->priv;
+			struct ptx_adap		*adap	= &card->adap[idx];
+			struct pxq3pe_adap	*p	= adap->priv;
 
-		if (i2cadr < card->adapn && adap->ON) {
-			tbuf[i] = PTX_TS_SYNC;
-			memcpy(&p->tBuf[p->tBufIdx], &tbuf[i], PKT_BYTES);
-			p->tBufIdx += PKT_BYTES;
-			if (p->tBufIdx >= PKT_BUFSZ) {
-				pxq3pe_dma_put_stream(p);
-				p->tBufIdx = 0;
+			if (idx < card->adapn && adap->ON) {
+				tbuf[i] = PTX_TS_SYNC;
+				memcpy(&p->tBuf[p->tBufIdx], &tbuf[i], PKT_BYTES);
+				p->tBufIdx += PKT_BYTES;
+				if (p->tBufIdx >= PKT_BUFSZ) {
+					pxq3pe_dma_put_stream(p);
+					p->tBufIdx = 0;
+				}
 			}
 		}
-	}
 	if (c->dma.ON[port])
 		writel(dmamgmt | (2 << (ch * 16)), bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
 	return IRQ_HANDLED;
@@ -383,40 +397,35 @@ int pxq3pe_thread(void *dat)
 	return 0;
 }
 
-void pxq3pe_dma_stop(struct ptx_adap *adap)
-{
-	struct ptx_card		*card	= adap->card;
-	struct pxq3pe_card	*c	= card->priv;
-	u8			i2cadr	= adap->fe.id,
-				i;
-	bool			port	= !(i2cadr & 4);
-
-	for (i = 0; i < card->adapn; i++)
-		if (!c->dma.ON[port] || (i2cadr != i && (i & 4) == (i2cadr & 4) && c->dma.ON[port]))
-			return;
-
-	i = readb(c->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
-	if ((i & 0b1100) == 4)
-		writeb(i & 0xFD, c->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
-	writeb(0b0011 << (port * 2), c->bar + PXQ3PE_IRQ_DISABLE);
-	c->dma.ON[port] = false;
-}
-
-bool pxq3pe_dma_start(struct ptx_adap *adap)
+int pxq3pe_dma(struct ptx_adap *adap, bool ON)
 {
 	struct ptx_card		*card	= adap->card;
 	struct pxq3pe_card	*c	= card->priv;
 	struct pxq3pe_adap	*p	= adap->priv;
-	u8	i2cadr	= adap->fe.id,
-		i;
-	bool	port	= !(i2cadr & 4);
-	u32	val	= 0b0011 << (port * 2);
+	struct i2c_client	*d	= adap->fe->demodulator_priv;
+	u8			idx	= (d->addr / 2) & (card->adapn - 1),
+				i;
+	bool			port	= !(idx & 4);
+	u32			val	= 0b0011 << (port * 2);
+
+	if (!ON) {
+		for (i = 0; i < card->adapn; i++)
+			if (!c->dma.ON[port] || (idx != i && (i & 4) == (idx & 4) && c->dma.ON[port]))
+				return 0;
+
+		i = readb(c->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
+		if ((i & 0b1100) == 4)
+			writeb(i & 0xFD, c->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
+		writeb(0b0011 << (port * 2), c->bar + PXQ3PE_IRQ_DISABLE);
+		c->dma.ON[port] = false;
+		return 0;
+	}
 
 	p->sBufByteCnt	= 0;
 	p->sBufStop	= 0;
 	p->sBufStart	= 0;
 	if (c->dma.ON[port])
-		return true;
+		return 0;
 
 	/* SetTSMode */
 	i = readb(c->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_TSMODE);
@@ -426,7 +435,7 @@ bool pxq3pe_dma_start(struct ptx_adap *adap)
 	/* irq_enable */
 	writel(val, c->bar + PXQ3PE_IRQ_ENABLE);
 	if (val != (readl(c->bar + PXQ3PE_IRQ_ACTIVE) & val))
-		return false;
+		return -EIO;
 
 	/* cfg_dma */
 	for (i = 0; i < 2; i++) {
@@ -439,26 +448,7 @@ bool pxq3pe_dma_start(struct ptx_adap *adap)
 					c->bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
 	}
 	c->dma.ON[port] = true;
-	return true;
-}
-
-int pxq3pe_stop_feed(struct dvb_demux_feed *feed)
-{
-	struct ptx_adap	*adap	= container_of(feed->demux, struct ptx_adap, demux);
-
-	pxq3pe_dma_stop(adap);
-	kthread_stop(adap->kthread);
 	return 0;
-}
-
-int pxq3pe_start_feed(struct dvb_demux_feed *feed)
-{
-	struct ptx_adap	*adap	= container_of(feed->demux, struct ptx_adap, demux);
-
-	if (!pxq3pe_dma_start(adap))
-		return	-EIO;
-	adap->kthread = kthread_run(pxq3pe_thread, adap, "%s_%d", adap->card->name, adap->fe.id);
-	return IS_ERR(adap->kthread) ? PTR_ERR(adap->kthread) : 0;
 }
 
 void pxq3pe_lnb(struct ptx_card *card, bool lnb)
@@ -468,27 +458,26 @@ void pxq3pe_lnb(struct ptx_card *card, bool lnb)
 
 void pxq3pe_remove(struct pci_dev *pdev)
 {
-	struct dma_map_ops	*ops	= get_dma_ops(&pdev->dev);
 	struct ptx_card		*card	= pci_get_drvdata(pdev);
-	struct pxq3pe_card	*c	= card->priv;
+	struct ptx_adap		*adap;
+	struct pxq3pe_card	*c;
 	u8	regctl = 0,
 		i;
 
 	if (!card)
 		return;
-	for (i = 0; i < card->adapn; i++) {
-		struct ptx_adap	*adap	= &card->adap[i];
-
-		pxq3pe_dma_stop(adap);
-		ptx_sleep(&adap->fe);
+	c	= card->priv;
+	for (i = 0, adap = card->adap; adap->fe && i < card->adapn; i++, adap++) {
+		pxq3pe_dma(adap, false);
+		ptx_sleep(adap->fe);
 	}
-	pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x80, &regctl, 1, PTX_MODE_GPIO);
+	pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x80, &regctl, 1, PXQ3PE_MOD_GPIO);
 	pxq3pe_power(card, false);
 
 	/* dma_hw_unmap */
 	free_irq(pdev->irq, card);
-	if (c->dma.dat && ops && ops->free)
-		ops->free(&pdev->dev, c->dma.sz, c->dma.dat, c->dma.adr, NULL);
+	if (c->dma.dat)
+		pci_free_consistent(card->pdev, c->dma.sz, c->dma.dat, c->dma.adr);
 	for (i = 0; i < card->adapn; i++) {
 		struct ptx_adap		*adap	= &card->adap[i];
 		struct pxq3pe_adap	*p	= adap->priv;
@@ -497,7 +486,7 @@ void pxq3pe_remove(struct pci_dev *pdev)
 	}
 	if (c->bar)
 		pci_iounmap(pdev, c->bar);
-	ptx_unregister_adap_fe(card);
+	ptx_unregister_adap(card);
 }
 
 static const struct i2c_algorithm pxq3pe_algo = {
@@ -508,27 +497,26 @@ static const struct i2c_algorithm pxq3pe_algo = {
 static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 {
 	struct ptx_subdev_info	pxq3pe_subdev_info[] = {
-		{SYS_ISDBT, 0x10, TC90522_MODNAME, 0x20, NM131_MODNAME},
-		{SYS_ISDBS, 0x11, TC90522_MODNAME, 0x21, TDA2014X_MODNAME},
-		{SYS_ISDBT, 0x12, TC90522_MODNAME, 0x22, NM131_MODNAME},
-		{SYS_ISDBS, 0x13, TC90522_MODNAME, 0x23, TDA2014X_MODNAME},
-		{SYS_ISDBT, 0x14, TC90522_MODNAME, 0x24, NM131_MODNAME},
-		{SYS_ISDBS, 0x15, TC90522_MODNAME, 0x25, TDA2014X_MODNAME},
-		{SYS_ISDBT, 0x16, TC90522_MODNAME, 0x26, NM131_MODNAME},
-		{SYS_ISDBS, 0x17, TC90522_MODNAME, 0x27, TDA2014X_MODNAME},
+		{SYS_ISDBT, 0x20, TC90522_MODNAME, 0x10, NM131_MODNAME},
+		{SYS_ISDBS, 0x22, TC90522_MODNAME, 0x11, TDA2014X_MODNAME},
+		{SYS_ISDBT, 0x24, TC90522_MODNAME, 0x12, NM131_MODNAME},
+		{SYS_ISDBS, 0x26, TC90522_MODNAME, 0x13, TDA2014X_MODNAME},
+		{SYS_ISDBT, 0x28, TC90522_MODNAME, 0x14, NM131_MODNAME},
+		{SYS_ISDBS, 0x2A, TC90522_MODNAME, 0x15, TDA2014X_MODNAME},
+		{SYS_ISDBT, 0x2C, TC90522_MODNAME, 0x16, NM131_MODNAME},
+		{SYS_ISDBS, 0x2E, TC90522_MODNAME, 0x17, TDA2014X_MODNAME},
 	};
 	struct ptx_card		*card	= ptx_alloc(pdev, KBUILD_MODNAME, ARRAY_SIZE(pxq3pe_subdev_info),
 						sizeof(struct pxq3pe_card), sizeof(struct pxq3pe_adap), pxq3pe_lnb);
-	struct pxq3pe_card	*c	= card->priv;
-	struct device		*dev	= &pdev->dev;
-	struct dma_map_ops	*ops	= get_dma_ops(dev);
+	struct pxq3pe_card	*c;
 	u8	regctl	= 0xA0,
 		i;
 	u16	cfg;
 	int	err	= !card || pci_read_config_word(pdev, PCI_COMMAND, &cfg);
 
-	if (err || !ops)
-		return ptx_abort(pdev, pxq3pe_remove, err, "Memory/PCI/DMA error, card=%p", card);
+	if (err)
+		return ptx_abort(pdev, pxq3pe_remove, err, "Memory/PCI error, card=%p", card);
+	c	= card->priv;
 	if (!(cfg & PCI_COMMAND_MASTER)) {
 		pci_set_master(pdev);
 		pci_read_config_word(pdev, PCI_COMMAND, &cfg);
@@ -545,7 +533,6 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 		struct ptx_adap		*adap	= &card->adap[i];
 		struct pxq3pe_adap	*p	= adap->priv;
 
-		adap->fe.id	= i;
 		p->sBufSize	= PKT_BYTES * 100 << 9;
 		p->sBuf		= vzalloc(p->sBufSize);
 		if (!p->sBuf)
@@ -553,16 +540,10 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 	}
 
 	/* dma_map */
-	c->dma.sz = PKT_BUFSZ * 4;
 	if (request_irq(pdev->irq, pxq3pe_irq, IRQF_SHARED, KBUILD_MODNAME, card))
 		return ptx_abort(pdev, pxq3pe_remove, -EIO, "IRQ failed");
-	if (dev->dma_mask && *dev->dma_mask && ops->alloc) {
-		u32 gfp = dev->coherent_dma_mask ? 0x21 - (dev->coherent_dma_mask >= 0x1000000) : 0x20;
-
-		if ((!dev->coherent_dma_mask || dev->coherent_dma_mask <= 0xFFFFFFFF) && !(gfp & 1))
-			gfp |= 4;
-		c->dma.dat = ops->alloc(dev, c->dma.sz, &c->dma.adr, gfp, NULL);
-	}
+	c->dma.sz	= PKT_BUFSZ * 4;
+	c->dma.dat	= pci_alloc_consistent(card->pdev, c->dma.sz, &c->dma.adr);
 	if (!c->dma.dat)
 		return ptx_abort(pdev, pxq3pe_remove, -EIO, "DMA mapping failed");
 
@@ -571,8 +552,8 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 	writel(0x3200C8, c->bar + 0x904);
 	writel(0x90,	 c->bar + 0x900);
 	writel(0x10000,	 c->bar + 0x880);
-	writel(0x0080,	 c->bar + PXQ3PE_DMA_TSMODE);
-	writel(0x0080,	 c->bar + PXQ3PE_DMA_TSMODE + PXQ3PE_DMA_OFFSET_PORT);
+	writel(0x0080,	 c->bar + PXQ3PE_DMA_TSMODE);				/* port 0 */
+	writel(0x0080,	 c->bar + PXQ3PE_DMA_TSMODE + PXQ3PE_DMA_OFFSET_PORT);	/* port 1 */
 	writel(0x0000,	 c->bar + 0x888);
 	writel(0x00CF,	 c->bar + 0x894);
 	writel(0x8000,	 c->bar + 0x88C);
@@ -586,12 +567,12 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 	pxq3pe_w_gpio0(card, 0, 1);
 	pxq3pe_w_gpio0(card, 1, 1);
 	for (i = 0; i < 16; i++)
-		if (!pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, auth + i, 1, PTX_MODE_GPIO))
+		if (!pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, auth + i, 1, PXQ3PE_MOD_GPIO))
 			break;
-	if (i < 16 || !pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 5, &regctl, 1, PTX_MODE_GPIO))
-		return ptx_abort(pdev, pxq3pe_remove, -EIO, "hw_init failed");
+	if (i < 16 || !pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 5, &regctl, 1, PXQ3PE_MOD_GPIO))
+		return ptx_abort(pdev, pxq3pe_remove, -EIO, "hw_init failed i=%d", i);
 	pxq3pe_power(card, true);
-	err = ptx_register_adap_fe(card, pxq3pe_subdev_info, pxq3pe_start_feed, pxq3pe_stop_feed);
+	err = ptx_register_adap(card, pxq3pe_subdev_info, pxq3pe_thread, pxq3pe_dma);
 	return err ? ptx_abort(pdev, pxq3pe_remove, err, "Unable to register DVB adapter & frontend") : 0;
 }
 

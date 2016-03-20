@@ -2,11 +2,11 @@
 
 KVER ?= $(shell uname -r)
 KBUILD := /lib/modules/$(KVER)/build
-SRCS := $(shell find $(PWD) -name "*.c")
-HDRS := $(shell find $(PWD) -name "*.h")
-INCS := $(addprefix -I, $(sort $(dir $(HDRS))))
+SRCS := $(shell find $(PWD)/drivers -name "*.c")
+HDRS := $(shell find $(PWD)/drivers -name "*.h")
+IDIR := $(sort $(dir $(HDRS))) drivers/media/dvb-core drivers/media/dvb-frontends drivers/media/tuners
 ldflags-y += -s
-ccflags-y += -O3 -Os -Wformat=2 -Wall -Werror $(INCS) -Idrivers/media/dvb-core -Idrivers/media/dvb-frontends
+ccflags-y += -O3 -Os -Wformat=2 -Wall -Werror $(addprefix -I, $(IDIR))
 MODS := $(shell eval source $(PWD)/dkms.conf; echo $${BUILT_MODULE_NAME[*]})
 DIRS := $(addprefix /lib/modules/$(KVER), $(shell eval source $(PWD)/dkms.conf; echo $${DEST_MODULE_LOCATION[*]}))
 DIR0 := $(firstword $(DIRS))
@@ -16,6 +16,7 @@ obj-m := $(TGTS:.ko=.o)
 
 OBJS := $(join $(shell eval source $(PWD)/dkms.conf; echo $${DEST_MODULE_LOCATION[*]} | sed "s|/kernel/||g"), $(addprefix /, $(addsuffix .o, $(MODS))))
 $(shell echo $(join $(TGTS:.ko=-objs:=), $(OBJS)) | sed "s/ /\n/g" > $(PWD)/m~)
+$(foreach OBJ, $(OBJS), $(shell egrep ccflags-y $(PWD)/$(dir $(OBJ))/Makefile >> $(PWD)/m~))
 $(foreach OBJ, $(OBJS), $(shell echo $(patsubst %.o, $(dir $(OBJ))%.o, $(shell egrep $(notdir $(OBJ:.o=-objs)) $(PWD)/$(dir $(OBJ))/Makefile)) >> $(PWD)/m~))
 include $(PWD)/m~
 
@@ -33,10 +34,11 @@ clean:
 	@$(RM) -v $(clean-files)
 
 check: clean
-	if [ -f /data/guest/smatch/smatch ] ; then \
-		make CHECK="/data/guest/smatch/smatch --full-path" CC=/data/guest/smatch/cgcc |& tee warns~; \
+	$(KBUILD)/scripts/checkpatch.pl --no-tree --show-types --ignore GCC_BINARY_CONSTANT --max-line-length=200 -f \
+		`find \( -iname "*c" -o -iname "*h" \)` | tee warns~
+	if [ -f /usr/local/smatch/smatch ] ; then \
+		make CHECK="/usr/local/smatch/smatch --full-path" CC=/usr/local/smatch/cgcc |& tee -a warns~; \
 	fi
-	$(KBUILD)/scripts/checkpatch.pl --no-tree --max-line-length=200 -f `find \( -iname "*c" -o -iname "*h" \)` | tee -a warns~
 
 uninstall:
 	rm -vfr $(DSTS)

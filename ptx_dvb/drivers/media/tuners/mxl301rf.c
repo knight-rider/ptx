@@ -12,44 +12,40 @@
 #include "dvb_frontend.h"
 #include "mxl301rf.h"
 
-struct mxl301rf {
-	struct i2c_adapter *i2c;
-	u8 adr_tuner;
-};
-
 int mxl301rf_w(struct dvb_frontend *fe, u8 slvadr, const u8 *dat, int len)
 {
-	u8 buf[len + 1];
-	struct mxl301rf	*t = fe->tuner_priv;
-	struct i2c_msg	msg[] = {
-		{.addr = fe->id,	.flags = 0,	.buf = buf,	.len = len + 1,},
+	struct i2c_client	*d	= fe->demodulator_priv;
+	u8			buf[len + 1];
+	struct i2c_msg		msg[] = {
+		{.addr = d->addr,	.flags = 0,	.buf = buf,	.len = len + 1,},
 	};
 
 	buf[0] = slvadr;
 	memcpy(buf + 1, dat, len);
-	return i2c_transfer(t->i2c, msg, 1) == 1 ? 0 : -EIO;
+	return i2c_transfer(d->adapter, msg, 1) == 1 ? 0 : -EIO;
 }
 
 int mxl301rf_w_tuner(struct dvb_frontend *fe, const u8 *dat, int len)
 {
 	u8 buf[len + 1];
 
-	buf[0] = ((struct mxl301rf *)fe->tuner_priv)->adr_tuner << 1;
+	buf[0] = ((struct i2c_client *)fe->tuner_priv)->addr << 1;
 	memcpy(buf + 1, dat, len);
 	return mxl301rf_w(fe, 0xFE, buf, len + 1);
 }
 
-void mxl301rf_r(struct dvb_frontend *fe, u8 regadr, u8 *dat)
+u8 mxl301rf_r(struct dvb_frontend *fe, u8 regadr)
 {
-	struct mxl301rf *t = fe->tuner_priv;
+	struct i2c_client	*d	= fe->demodulator_priv,
+				*t	= fe->tuner_priv;
 	u8	wbuf[]	= {0xFB, regadr},
-		rbuf[]	= {0xFE, (t->adr_tuner << 1) | 1, 0};
+		rbuf[]	= {0xFE, (t->addr << 1) | 1, 0};
 	struct i2c_msg msg[] = {
-		{.addr	= fe->id,	.flags	= 0,		.buf	= rbuf,		.len	= 2,},
-		{.addr	= fe->id,	.flags	= I2C_M_RD,	.buf	= rbuf + 2,	.len	= 1,},
+		{.addr	= d->addr,	.flags	= 0,		.buf	= rbuf,		.len	= 2,},
+		{.addr	= d->addr,	.flags	= I2C_M_RD,	.buf	= rbuf + 2,	.len	= 1,},
 	};
 	mxl301rf_w_tuner(fe, wbuf, sizeof(wbuf));
-	*dat	= t->adr_tuner && (i2c_transfer(t->i2c, msg, 2) == 2) ? rbuf[2] : 0;
+	return t->addr && (i2c_transfer(d->adapter, msg, 2) == 2) ? rbuf[2] : 0;
 }
 
 enum mxl301rf_agc {
@@ -138,8 +134,6 @@ int mxl301rf_tune(struct dvb_frontend *fe)
 		tmp	= freq % MHz,
 		i,
 		fdiv	= 1000000;
-	bool	rfsynth_locked,
-		refsynth_locked;
 	unsigned long timeout;
 
 	if (err)
@@ -176,11 +170,7 @@ int mxl301rf_tune(struct dvb_frontend *fe)
 	mxl301rf_w_tuner(fe, idac, sizeof(idac));
 	timeout = jiffies + msecs_to_jiffies(100);
 	while (time_before(jiffies, timeout)) {
-		mxl301rf_r(fe, 0x16, dat);
-		rfsynth_locked	= (*dat & 0x0c) == 0x0c;
-		mxl301rf_r(fe, 0x16, dat);
-		refsynth_locked	= (*dat & 0x03) == 0x03;
-		if (rfsynth_locked && refsynth_locked)
+		if ((mxl301rf_r(fe, 0x16) & 0x0c) == 0x0c && (mxl301rf_r(fe, 0x16) & 0x03) == 0x03)
 			return mxl301rf_set_agc(fe, MXL301RF_AGC_AUTO);
 		msleep_interruptible(1);
 	}
@@ -199,31 +189,14 @@ int mxl301rf_wakeup(struct dvb_frontend *fe)
 	return 0;
 }
 
-static struct dvb_tuner_ops mxl301rf_ops = {
-	.set_params	= mxl301rf_tune,
-	.sleep		= mxl301rf_sleep,
-	.init		= mxl301rf_wakeup,
-};
-
-int mxl301rf_remove(struct i2c_client *c)
+int mxl301rf_probe(struct i2c_client *t, const struct i2c_device_id *id)
 {
-	kfree(i2c_get_clientdata(c));
-	return 0;
-}
-
-int mxl301rf_probe(struct i2c_client *c, const struct i2c_device_id *id)
-{
-	struct dvb_frontend	*fe	= c->dev.platform_data;
-	struct mxl301rf		*t	= kzalloc(sizeof(struct mxl301rf), GFP_KERNEL);
+	struct dvb_frontend	*fe	= t->dev.platform_data;
 	u8			d[]	= {0x10, 0x01};
 
-	if (!t)
-		return -ENOMEM;
-	t->i2c		= c->adapter;
-	t->adr_tuner	= c->addr;
-	fe->tuner_priv	= t;
-	memcpy(&fe->ops.tuner_ops, &mxl301rf_ops, sizeof(struct dvb_tuner_ops));
-	i2c_set_clientdata(c, t);
+	fe->ops.tuner_ops.set_params	= mxl301rf_tune;
+	fe->ops.tuner_ops.sleep		= mxl301rf_sleep;
+	fe->ops.tuner_ops.init		= mxl301rf_wakeup;
 	return	mxl301rf_w(fe, 0x1c, d, 1)	||
 		mxl301rf_w(fe, 0x1d, d+1, 1);
 }
@@ -235,12 +208,8 @@ static struct i2c_device_id mxl301rf_id[] = {
 MODULE_DEVICE_TABLE(i2c, mxl301rf_id);
 
 static struct i2c_driver mxl301rf_driver = {
-	.driver = {
-		.owner	= THIS_MODULE,
-		.name	= mxl301rf_id->name,
-	},
+	.driver.name	= mxl301rf_id->name,
 	.probe		= mxl301rf_probe,
-	.remove		= mxl301rf_remove,
 	.id_table	= mxl301rf_id,
 };
 module_i2c_driver(mxl301rf_driver);

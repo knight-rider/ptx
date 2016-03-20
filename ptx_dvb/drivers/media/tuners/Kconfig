@@ -271,12 +271,13 @@ config MEDIA_TUNER_MXL301RF
 	help
 	  MaxLinear MxL301RF OFDM tuner driver.
 
-config MEDIA_TUNER_QM1D1C0042
-	tristate "Sharp QM1D1C0042 tuner"
+config MEDIA_TUNER_QM1D1C004X
+	tristate "Sharp QM1D1C004x tuner"
 	depends on MEDIA_SUPPORT && I2C
 	default m if !MEDIA_SUBDRV_AUTOSELECT
 	help
-	  Sharp QM1D1C0042 trellis coded 8PSK tuner driver.
+	  Sharp trellis coded 8PSK tuner driver.
+	  Supported chips: QM1D1C0042, QM1D1C0045
 
 config MEDIA_TUNER_NM131
 	tristate "Newport Media tuners NM131, NM130 and NM120"
