@@ -1,8 +1,8 @@
 /*
- * Common procedures for PT3 & PX-Q3PE DVB driver
- *
- * Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
- */
+	Common procedures for PT3, PX-Q3PE, and other DVB drivers
+
+	Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
+*/
 
 #include "ptx_common.h"
 
@@ -46,7 +46,8 @@ int ptx_stop_feed(struct dvb_demux_feed *feed)
 	struct ptx_adap	*adap	= container_of(feed->demux, struct ptx_adap, demux);
 
 	adap->card->dma(adap, false);
-	kthread_stop(adap->kthread);
+	if (adap->kthread)
+		kthread_stop(adap->kthread);
 	return 0;
 }
 
@@ -54,8 +55,9 @@ int ptx_start_feed(struct dvb_demux_feed *feed)
 {
 	struct ptx_adap	*adap	= container_of(feed->demux, struct ptx_adap, demux);
 
-	adap->kthread = kthread_run(adap->card->thread, adap, "%s_%d%c", adap->dvb.name, adap->dvb.num,
-				adap->fe->dtv_property_cache.delivery_system == SYS_ISDBS ? 's' : 't');
+	if (adap->card->thread)
+		adap->kthread = kthread_run(adap->card->thread, adap, "%s_%d%c", adap->dvb.name, adap->dvb.num,
+					adap->fe->dtv_property_cache.delivery_system == SYS_ISDBS ? 's' : 't');
 	return IS_ERR(adap->kthread) ? PTR_ERR(adap->kthread) : adap->card->dma(adap, true);
 }
 
@@ -219,7 +221,6 @@ int ptx_register_adap(struct ptx_card *card, const struct ptx_subdev_info *info,
 		adap->fe->ops.sleep	= ptx_sleep;
 		adap->fe->ops.init	= ptx_wakeup;
 		ptx_sleep(adap->fe);
-		mutex_init(&adap->lock);
 	}
 	return 0;
 }

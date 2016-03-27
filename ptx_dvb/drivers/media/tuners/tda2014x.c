@@ -1,10 +1,9 @@
 /*
- * Driver for NXP Semiconductors tuner TDA2014x
- *
- * Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
- */
+	Driver for NXP Semiconductors tuner TDA2014x
 
-#include <linux/pci.h>
+	Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
+*/
+
 #include "dvb_frontend.h"
 #include "tda2014x.h"
 

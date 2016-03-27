@@ -20,6 +20,7 @@
 #include "dmxdev.h"
 
 enum ePTX {
+	PTX_TS_SIZE	= 188,
 	PTX_TS_SYNC	= 0x47,
 	PTX_TS_NOT_SYNC	= 0x74,
 };
@@ -46,7 +47,6 @@ struct ptx_card {
 
 struct ptx_adap {
 	struct ptx_card		*card;
-	struct mutex		lock;
 	bool			ON;
 	struct dvb_adapter	dvb;
 	struct dvb_demux	demux;

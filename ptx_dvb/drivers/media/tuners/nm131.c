@@ -1,10 +1,9 @@
 /*
- * Driver for Newport Media tuners NMI131, NMI130 and NMI120
- *
- * Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
- */
+	Driver for Newport Media tuners NMI131, NMI130 and NMI120
 
-#include <linux/pci.h>
+	Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
+*/
+
 #include "dvb_frontend.h"
 #include "nm131.h"
 

@@ -1,14 +1,14 @@
 /*
- * DVB driver for PLEX PX-Q3PE ISDB-S/T PCIE receiver
- *
- * Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
- *
- * Main components:
- *	ASIE5606X8	- controller
- *	TC90522		- 2ch OFDM ISDB-T + 2ch 8PSK ISDB-S demodulator
- *	TDA20142	- ISDB-S tuner
- *	NM120		- ISDB-T tuner
- */
+	DVB driver for PLEX PX-Q3PE ISDB-S/T PCIE receiver
+
+	Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
+
+	Main components:
+	ASIE5606X8	- controller
+	TC90522		- 2ch OFDM ISDB-T + 2ch 8PSK ISDB-S demodulator
+	TDA20142	- ISDB-S tuner
+	NM120		- ISDB-T tuner
+*/
 
 #include <linux/interrupt.h>
 #include "ptx_common.h"
@@ -37,9 +37,8 @@ static struct pci_device_id pxq3pe_id_table[] = {
 MODULE_DEVICE_TABLE(pci, pxq3pe_id_table);
 
 enum ePXQ3PE {
-	PKT_BYTES	= 188,
 	PKT_NUM		= 312,
-	PKT_BUFSZ	= PKT_BYTES * PKT_NUM,
+	PKT_BUFSZ	= PTX_TS_SIZE * PKT_NUM,
 
 	PXQ3PE_MOD_GPIO		= 0,
 	PXQ3PE_MOD_TUNER	= 1,
@@ -342,7 +341,7 @@ irqreturn_t pxq3pe_irq(int irq, void *ctx)
 	writel(irqstat, bar + PXQ3PE_IRQ_CLEAR);
 	dmamgmt = readl(bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_MGMT);
 	if ((readl(bar + PXQ3PE_DMA_OFFSET_PORT * port + PXQ3PE_DMA_OFFSET_CH * ch + PXQ3PE_DMA_XFR_STAT) & 0x3FFFFF) == PKT_BUFSZ)
-		for (i = 0; i < PKT_BUFSZ; i += PKT_BYTES) {
+		for (i = 0; i < PKT_BUFSZ; i += PTX_TS_SIZE) {
 			u8 idx = !port * 4 + (tbuf[i] == 0xC7 ? 0 : tbuf[i] == 0x47 ?
 					1 : tbuf[i] == 0x07 ? 2 : tbuf[i] == 0x87 ? 3 : card->adapn);
 			struct ptx_adap		*adap	= &card->adap[idx];
@@ -350,8 +349,8 @@ irqreturn_t pxq3pe_irq(int irq, void *ctx)
 
 			if (idx < card->adapn && adap->ON) {
 				tbuf[i] = PTX_TS_SYNC;
-				memcpy(&p->tBuf[p->tBufIdx], &tbuf[i], PKT_BYTES);
-				p->tBufIdx += PKT_BYTES;
+				memcpy(&p->tBuf[p->tBufIdx], &tbuf[i], PTX_TS_SIZE);
+				p->tBufIdx += PTX_TS_SIZE;
 				if (p->tBufIdx >= PKT_BUFSZ) {
 					pxq3pe_dma_put_stream(p);
 					p->tBufIdx = 0;
@@ -383,15 +382,15 @@ int pxq3pe_thread(void *dat)
 		}
 		if (sz > p->sBufByteCnt)
 			sz = p->sBufByteCnt;
-		while (j < sz / PKT_BYTES) {
+		while (j < sz / PTX_TS_SIZE) {
 			j++;
 			i += 4;
-			while (i < j * PKT_BYTES)
+			while (i < j * PTX_TS_SIZE)
 				for (k = 0; k < 8; k++, i++)
 					rbuf[i] ^= xor[idx[k]];
 		}
 		dvb_dmx_swfilter(&adap->demux, rbuf, sz);
-		p->sBufStart = (p->sBufStart + sz) % p->sBufSize;
+		p->sBufStart	= (p->sBufStart + sz) % p->sBufSize;
 		p->sBufByteCnt -= sz;
 	}
 	return 0;
@@ -533,7 +532,7 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 		struct ptx_adap		*adap	= &card->adap[i];
 		struct pxq3pe_adap	*p	= adap->priv;
 
-		p->sBufSize	= PKT_BYTES * 100 << 9;
+		p->sBufSize	= PTX_TS_SIZE * 100 << 9;
 		p->sBuf		= vzalloc(p->sBufSize);
 		if (!p->sBuf)
 			return ptx_abort(pdev, pxq3pe_remove, -ENOMEM, "No memory for stream buffer");

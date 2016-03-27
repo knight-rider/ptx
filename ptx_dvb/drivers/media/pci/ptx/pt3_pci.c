@@ -1,14 +1,15 @@
 /*
- * DVB driver for Earthsoft PT3 ISDB-S/T PCIE bridge Altera Cyclone IV FPGA EP4CGX15BF14C8N
- *
- * Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
+	DVB driver for Earthsoft PT3 ISDB-S/T PCIE bridge Altera Cyclone IV FPGA EP4CGX15BF14C8N
 
+	Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+*/
+
+#include <linux/interrupt.h>
 #include "tc90522.h"
 #include "qm1d1c004x.h"
 #include "mxl301rf.h"
@@ -57,14 +58,13 @@ struct pt3_card {
 struct pt3_dma {
 	dma_addr_t	adr;
 	u8		*dat;
-	u32		sz,
-			pos;
+	u32		sz;
 };
 
 struct pt3_adap {
-	u32	ts_pos,
-		ts_count,
-		desc_count;
+	u32	ts_blk_idx,
+		ts_blk_cnt,
+		desc_pg_cnt;
 	void __iomem	*dma_base;
 	struct pt3_dma	*ts_info,
 			*desc_info;
@@ -72,19 +72,26 @@ struct pt3_adap {
 
 int pt3_i2c_flush(struct pt3_card *c, u32 start_addr)
 {
-	u32 i2c_wait(void)
+	u32	val	= 0b0110,
+		i	= 999;
+
+	void i2c_wait(void)
 	{
 		while (1) {
-			u32 val = readl(c->bar_reg + PT3_REG_I2C_R);
+			val = readl(c->bar_reg + PT3_REG_I2C_R);
 
-			if (!(val & 1))					/* sequence stopped */
-				return val;
+			if (!(val & 1))						/* sequence stopped */
+				return;
 			msleep_interruptible(0);
 		}
 	}
-	i2c_wait();
-	writel(1 << 16 | start_addr, c->bar_reg + PT3_REG_I2C_W);	/* 0x00010000 start sequence */
-	return i2c_wait() & 0b0110 ? -EIO : 0;				/* ACK status */
+
+	while ((val & 0b0110) && i--) {						/* I2C bus is dirty */
+		i2c_wait();
+		writel(1 << 16 | start_addr, c->bar_reg + PT3_REG_I2C_W);	/* 0x00010000 start sequence */
+		i2c_wait();
+	}
+	return val & 0b0110 ? -EIO : 0;						/* ACK status */
 }
 
 int pt3_i2c_xfr(struct i2c_adapter *i2c, struct i2c_msg *msg, int sz)
@@ -205,87 +212,21 @@ int pt3_power(struct dvb_frontend *fe, u8 pwr)
 	return i2c_transfer(d->adapter, msg, 1) == 1 ? 0 : -EIO;
 }
 
-int pt3_thread(void *dat)
-{
-	struct ptx_adap	*adap	= dat;
-	struct pt3_adap	*p	= adap->priv;
-	struct pt3_dma	*ts;
-	int		i,
-			prev;
-	size_t		csize,
-			remain	= 0;
-
-	set_freezable();
-	while (!kthread_should_stop()) {
-		try_to_freeze();
-		while (p->ts_info[p->ts_pos].sz > remain) {
-			remain = p->ts_info[p->ts_pos].sz;
-			mutex_lock(&adap->lock);
-			while (remain > 0) {
-				for (i = 0; i < 20; i++) {
-					struct pt3_dma	*ts;
-					u32	next	= p->ts_pos + 1;
-
-					if (next >= p->ts_count)
-						next = 0;
-					ts = &p->ts_info[next];
-					if (ts->dat[ts->pos] == PTX_TS_SYNC)
-						break;
-//usleep_range(100, 10000);
-					msleep_interruptible(0);
-				}
-				if (i == 20)
-					break;
-				prev = p->ts_pos - 1;
-				if (prev < 0 || p->ts_count <= prev)
-					prev = p->ts_count - 1;
-				ts = &p->ts_info[p->ts_pos];
-				while (remain > 0) {
-					csize = (remain < (ts->sz - ts->pos)) ?
-						 remain : (ts->sz - ts->pos);
-					dvb_dmx_swfilter(&adap->demux, &ts->dat[ts->pos], csize);
-					remain -= csize;
-					ts->pos += csize;
-					if (ts->pos < ts->sz)
-						continue;
-					ts->pos = 0;
-					ts->dat[ts->pos] = PTX_TS_NOT_SYNC;
-					p->ts_pos++;
-					if (p->ts_pos >= p->ts_count)
-						p->ts_pos = 0;
-					break;
-				}
-			}
-			mutex_unlock(&adap->lock);
-		}
-		if (p->ts_info[p->ts_pos].sz < remain)
-			msleep_interruptible(0);
-//usleep_range(100, 20000);
-	}
-	return 0;
-}
-
 int pt3_dma_run(struct ptx_adap *adap, bool ON)
 {
-	struct pt3_adap	*p		= adap->priv;
-	void __iomem	*base		= p->dma_base;
-	u64		start_addr	= p->desc_info->adr,
-			i		= 999;
+	struct pt3_adap	*p	= adap->priv;
+	void __iomem	*base	= p->dma_base;
+	int		i	= 999;
 
 	if (ON) {
-		for (i = 0; i < p->ts_count; i++) {
-			struct pt3_dma *ts = &p->ts_info[i];
-
-			memset(ts->dat, 0, ts->sz);
-			ts->pos = 0;
-			*ts->dat = PTX_TS_NOT_SYNC;
-		}
-		p->ts_pos = 0;
-		writel(2, base + PT3_DMA_CTL);		/* stop DMA */
-		writeq(start_addr, base + PT3_DMA_DESC);
-		writel(1, base + PT3_DMA_CTL);		/* start DMA */
+		for (i = 0; i < p->ts_blk_cnt; i++)		/* 17 */
+			*p->ts_info[i].dat	= PTX_TS_NOT_SYNC;
+		p->ts_blk_idx = 0;
+		writel(2, base + PT3_DMA_CTL);			/* stop DMA */
+		writeq(p->desc_info->adr, base + PT3_DMA_DESC);
+		writel(1, base + PT3_DMA_CTL);			/* start DMA */
 	} else {
-		writel(2, base + PT3_DMA_CTL);		/* stop DMA */
+		writel(2, base + PT3_DMA_CTL);			/* stop DMA */
 		while (i--) {
 			if (!(readl(base + PT3_STATUS) & 1))
 				break;
@@ -293,6 +234,30 @@ int pt3_dma_run(struct ptx_adap *adap, bool ON)
 		}
 	}
 	return i ? 0 : -ETIMEDOUT;
+}
+
+int pt3_thread(void *dat)
+{
+	struct ptx_adap	*adap	= dat;
+	struct pt3_adap	*p	= adap->priv;
+	struct pt3_dma	*ts;
+
+	set_freezable();
+	while (!kthread_should_stop()) {
+		u32 next = (p->ts_blk_idx + 1) % p->ts_blk_cnt;
+
+		try_to_freeze();
+		ts = p->ts_info + next;
+		if (*ts->dat != PTX_TS_SYNC) {		/* wait until 1 TS block is full */
+			schedule_timeout_interruptible(0);
+			continue;
+		}
+		ts = p->ts_info + p->ts_blk_idx;
+		dvb_dmx_swfilter_packets(&adap->demux, ts->dat, ts->sz / PTX_TS_SIZE);
+		*ts->dat	= PTX_TS_NOT_SYNC;	/* mark as read */
+		p->ts_blk_idx	= next;
+	}
+	return 0;
 }
 
 void pt3_remove(struct pci_dev *pdev)
@@ -313,7 +278,7 @@ void pt3_remove(struct pci_dev *pdev)
 
 		pt3_dma_run(adap, false);
 		if (p->ts_info) {
-			for (j = 0; j < p->ts_count; j++) {
+			for (j = 0; j < p->ts_blk_cnt; j++) {
 				page = &p->ts_info[j];
 				if (page->dat)
 					pci_free_consistent(adap->card->pdev, page->sz, page->dat, page->adr);
@@ -321,7 +286,7 @@ void pt3_remove(struct pci_dev *pdev)
 			kfree(p->ts_info);
 		}
 		if (p->desc_info) {
-			for (j = 0; j < p->desc_count; j++) {
+			for (j = 0; j < p->desc_pg_cnt; j++) {
 				page = &p->desc_info[j];
 				if (page->dat)
 					pci_free_consistent(adap->card->pdev, page->sz, page->dat, page->adr);
@@ -352,75 +317,67 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	};
 	struct ptx_card	*card	= ptx_alloc(pdev, KBUILD_MODNAME, ARRAY_SIZE(pt3_subdev_info),
 					sizeof(struct pt3_card), sizeof(struct pt3_adap), pt3_lnb);
-	struct dma_desc {
-		u64 page_addr;
-		u32 page_size;
-		u64 next_desc;
-	} __packed;		/* 20 bytes */
-	enum {
-		DMA_DESC_SIZE	= sizeof(struct dma_desc),
-//		DMA_PAGE_SIZE	= 4096,
-//		DMA_MAX_DESCS	= DMA_PAGE_SIZE / DMA_DESC_SIZE,	/* 204 */
-		DMA_MAX_DESCS	= 204,
-		DMA_PAGE_SIZE	= DMA_MAX_DESCS * DMA_DESC_SIZE,	/* 4080 bytes */
-		DMA_PAGE_COUNT	= 47,
-		DMA_BLOCK_SIZE	= DMA_PAGE_SIZE * DMA_PAGE_COUNT,
-		DMA_BLOCK_COUNT	= 17,
-	};
 
 	bool dma_create(struct pt3_adap	*p)
 	{
+		struct dma_desc {
+			u64 page_addr;
+			u32 page_size;
+			u64 next_desc;
+		} __packed;		/* 20B */
+		enum {
+			DESC_SZ		= sizeof(struct dma_desc),		/* 20B	*/
+			DESC_MAX	= 4096 / DESC_SZ,			/* 204	*/
+			DESC_PAGE_SZ	= DESC_MAX * DESC_SZ,			/* 4080	*/
+			TS_PAGE_CNT	= PTX_TS_SIZE / 4,			/* 47	*/
+			TS_BLOCK_CNT	= 17,
+		};
 		struct pt3_dma	*descinfo;
 		struct dma_desc	*prev		= NULL,
 				*curr;
 		u32		i,
 				j,
-				desc_remain	= 0,
-				desc_info_idx	= 0;
+				desc_todo	= 0,
+				desc_pg_idx	= 0;
 		u64		desc_addr;
 
-		p->desc_count	= roundup(DMA_PAGE_COUNT * DMA_BLOCK_COUNT, DMA_MAX_DESCS);	/* 4	*/
-		p->desc_info	= kcalloc(p->desc_count, sizeof(struct pt3_dma), GFP_KERNEL);
-		p->ts_count	= DMA_BLOCK_COUNT;						/* 17	*/
-		p->ts_info	= kcalloc(p->ts_count, sizeof(struct pt3_dma), GFP_KERNEL);
+		p->ts_blk_cnt	= TS_BLOCK_CNT;							/* 17	*/
+		p->desc_pg_cnt	= roundup(TS_PAGE_CNT * p->ts_blk_cnt, DESC_MAX);		/* 4	*/
+		p->ts_info	= kcalloc(p->ts_blk_cnt, sizeof(struct pt3_dma), GFP_KERNEL);
+		p->desc_info	= kcalloc(p->desc_pg_cnt, sizeof(struct pt3_dma), GFP_KERNEL);
 		if (!p->ts_info || !p->desc_info)
 			return false;
-		for (i = 0; i < p->desc_count; i++) {						/* 4	*/
-			p->desc_info[i].sz	= DMA_PAGE_SIZE;				/* 4080	*/
-			p->desc_info[i].pos	= 0;
-			p->desc_info[i].dat	= pci_alloc_consistent(card->pdev, DMA_PAGE_SIZE, &p->desc_info[i].adr);
+		for (i = 0; i < p->desc_pg_cnt; i++) {						/* 4	*/
+			p->desc_info[i].sz	= DESC_PAGE_SZ;					/* 4080B, max 204 * 4 = 816 descs */
+			p->desc_info[i].dat	= pci_alloc_consistent(card->pdev, p->desc_info[i].sz, &p->desc_info[i].adr);
 			if (!p->desc_info[i].dat)
 				return false;
+			memset(p->desc_info[i].dat, 0, p->desc_info[i].sz);
 		}
-		for (i = 0; i < p->ts_count; i++) {						/* 17	*/
-			p->ts_info[i].sz	= DMA_BLOCK_SIZE;
-			p->ts_info[i].pos	= 0;
-			p->ts_info[i].dat	= pci_alloc_consistent(card->pdev, DMA_BLOCK_SIZE, &p->ts_info[i].adr);
+		for (i = 0; i < p->ts_blk_cnt; i++) {						/* 17	*/
+			p->ts_info[i].sz	= DESC_PAGE_SZ * TS_PAGE_CNT;			/* 1020 pkts, 4080 * 47 = 191760B, total 3259920B */
+			p->ts_info[i].dat	= pci_alloc_consistent(card->pdev, p->ts_info[i].sz, &p->ts_info[i].adr);
 			if (!p->ts_info[i].dat)
 				return false;
-			for (j = 0; j < DMA_PAGE_COUNT; j++) {
-				if (desc_remain < DMA_DESC_SIZE) {
-					descinfo	= p->desc_info + desc_info_idx;
-					descinfo->pos	= 0;
+			for (j = 0; j < TS_PAGE_CNT; j++) {					/* 47, total 47 * 17 = 799 pages */
+				if (!desc_todo) {						/* 20	*/
+					descinfo	= p->desc_info + desc_pg_idx;		/* jump to next desc_pg */
 					curr		= (struct dma_desc *)descinfo->dat;
 					desc_addr	= descinfo->adr;
-					desc_remain	= DMA_PAGE_SIZE;
-					desc_info_idx++;
+					desc_todo	= DESC_MAX;				/* 204	*/
+					desc_pg_idx++;
 				}
 				if (prev)
-					prev->next_desc = desc_addr | 2;
-				curr->page_addr = 7 | (p->ts_info[i].adr + DMA_PAGE_SIZE * j);
-				curr->page_size = 7 | DMA_PAGE_SIZE;
-				curr->next_desc = 2;
-
+					prev->next_desc = desc_addr;
+				curr->page_addr = p->ts_info[i].adr + DESC_PAGE_SZ * j;
+				curr->page_size = DESC_PAGE_SZ;
+				curr->next_desc = p->desc_info->adr;				/* circular link */
 				prev		= curr;
-				descinfo->pos	+= DMA_DESC_SIZE;
-				curr		= (struct dma_desc *)(descinfo->dat + descinfo->pos);
-				desc_addr	+= DMA_DESC_SIZE;
-				desc_remain	-= DMA_DESC_SIZE;
+				curr++;
+				desc_addr	+= DESC_SZ;
+				desc_todo--;
 			}
 		}
-		prev->next_desc = p->desc_info->adr | 2;
 		return true;
 	}
 
@@ -454,7 +411,9 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		pt3_power(adap->fe, PT3_PWR_TUNER_ON)					||
 		pt3_i2c_flush(c, PT3_I2C_START_ADDR)					||
 		pt3_power(adap->fe, PT3_PWR_TUNER_ON | PT3_PWR_AMP_ON);
-	return ret ? ptx_abort(pdev, pt3_remove, ret, "Unable to register I2C/DVB adapter/frontend") : 0;
+	return	ret ?
+		ptx_abort(pdev, pt3_remove, ret, "Unable to register I2C/DVB adapter/frontend") :
+		0;
 }
 
 static struct pci_driver pt3_driver = {
