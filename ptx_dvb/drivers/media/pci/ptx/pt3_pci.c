@@ -9,7 +9,6 @@
 	GNU General Public License for more details.
 */
 
-#include <linux/interrupt.h>
 #include "tc90522.h"
 #include "qm1d1c004x.h"
 #include "mxl301rf.h"
