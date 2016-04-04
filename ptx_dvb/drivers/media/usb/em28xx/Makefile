@@ -14,10 +14,8 @@ ccflags-y += -Idrivers/media/i2c
 ccflags-y += -Idrivers/media/tuners
 ccflags-y += -Idrivers/media/dvb-core
 ccflags-y += -Idrivers/media/dvb-frontends
+ccflags-y += -Idrivers/media/pci/ptx
 
 #only for test, remove later!
-em28xx-objs := em28xx-core.o em28xx-i2c.o em28xx-cards.o em28xx-camera.o
-em28xx-dvb-objs := em28xx-dvb.o ptx_common.o
 ccflags-y += -I/usr/src/kernel-4.1.15-2.mga5/drivers/media/tuners
 ccflags-y += -I/usr/src/kernel-4.1.15-2.mga5/drivers/media/dvb-frontends
-

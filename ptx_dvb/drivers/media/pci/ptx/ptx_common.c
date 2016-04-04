@@ -1,10 +1,14 @@
 /*
-	Common procedures for PT3, PX-Q3PE, and other DVB drivers
+	Registration procedures for PT3, PX-Q3PE, PX-BCUD and other DVB drivers
 
 	Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
 */
 
 #include "ptx_common.h"
+
+MODULE_AUTHOR(PTX_AUTH);
+MODULE_DESCRIPTION("Common DVB registration procedures");
+MODULE_LICENSE("GPL");
 
 void ptx_lnb(struct ptx_card *card)
 {
@@ -184,11 +188,11 @@ void ptx_unregister_adap(struct ptx_card *card)
 	kfree(card);
 }
 
-DVB_DEFINE_MOD_OPT_ADAPTER_NR(adap_no);
 int ptx_register_adap(struct ptx_card *card, const struct ptx_subdev_info *info,
 			int (*thread)(void *), int (*dma)(struct ptx_adap *, bool))
 {
 	struct ptx_adap	*adap;
+	short	adap_no[DVB_MAX_ADAPTERS] = {};
 	u8	i;
 	int	err;
 
@@ -249,4 +253,14 @@ u32 ptx_i2c_func(struct i2c_adapter *i2c)
 	return I2C_FUNC_I2C | I2C_FUNC_NOSTART;
 }
 
+EXPORT_SYMBOL(ptx_alloc);
+EXPORT_SYMBOL(ptx_sleep);
+EXPORT_SYMBOL(ptx_wakeup);
+EXPORT_SYMBOL(ptx_i2c_add_adapter);
+EXPORT_SYMBOL(ptx_unregister_fe);
+EXPORT_SYMBOL(ptx_register_fe);
+EXPORT_SYMBOL(ptx_unregister_adap);
+EXPORT_SYMBOL(ptx_register_adap);
+EXPORT_SYMBOL(ptx_abort);
+EXPORT_SYMBOL(ptx_i2c_func);
 

@@ -14,7 +14,7 @@
 #include "mxl301rf.h"
 #include "ptx_common.h"
 
-MODULE_AUTHOR("Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>");
+MODULE_AUTHOR(PTX_AUTH);
 MODULE_DESCRIPTION("Earthsoft PT3 DVB Driver");
 MODULE_LICENSE("GPL");
 
@@ -222,7 +222,8 @@ int pt3_dma_run(struct ptx_adap *adap, bool ON)
 			*p->ts_info[i].dat	= PTX_TS_NOT_SYNC;
 		p->ts_blk_idx = 0;
 		writel(2, base + PT3_DMA_CTL);			/* stop DMA */
-		writeq(p->desc_info->adr, base + PT3_DMA_DESC);
+		writel(p->desc_info->adr & 0xffffffff, base + PT3_DMA_DESC);
+		writel((u64)p->desc_info->adr >> 32, base + PT3_DMA_DESC + 4);
 		writel(1, base + PT3_DMA_CTL);			/* start DMA */
 	} else {
 		writel(2, base + PT3_DMA_CTL);			/* stop DMA */
@@ -333,12 +334,12 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		};
 		struct pt3_dma	*descinfo;
 		struct dma_desc	*prev		= NULL,
-				*curr;
+				*curr		= NULL;
 		u32		i,
 				j,
 				desc_todo	= 0,
 				desc_pg_idx	= 0;
-		u64		desc_addr;
+		u64		desc_addr	= 0;
 
 		p->ts_blk_cnt	= TS_BLOCK_CNT;							/* 17	*/
 		p->desc_pg_cnt	= roundup(TS_PAGE_CNT * p->ts_blk_cnt, DESC_MAX);		/* 4	*/

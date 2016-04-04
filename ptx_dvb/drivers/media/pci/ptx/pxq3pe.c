@@ -11,17 +11,17 @@
 */
 
 #include <linux/interrupt.h>
+#include <linux/vmalloc.h>
 #include "ptx_common.h"
 #include "tc90522.h"
 #include "tda2014x.h"
 #include "nm131.h"
 
-#define MOD_AUTH "Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>"
-MODULE_AUTHOR(MOD_AUTH);
+MODULE_AUTHOR(PTX_AUTH);
 MODULE_DESCRIPTION("PLEX PX-Q3PE Driver");
 MODULE_LICENSE("GPL");
 
-static char	*auth	= MOD_AUTH;
+static char	*auth	= PTX_AUTH;
 static int	ni,
 		nx,
 		idx[8]	= {},

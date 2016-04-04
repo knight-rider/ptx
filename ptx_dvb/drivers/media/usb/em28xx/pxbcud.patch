@@ -1,19 +1,43 @@
-diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/Kconfig drivers/media/usb/em28xx/Kconfig
---- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/Kconfig	2015-06-22 14:05:43.000000000 +0900
-+++ drivers/media/usb/em28xx/Kconfig	2016-03-16 02:42:57.000000000 +0900
-@@ -59,6 +59,8 @@
+diff -Naur a/drivers/media/Kconfig b/drivers/media/Kconfig
+--- a/drivers/media/Kconfig	2016-04-04 06:26:47.675126876 +0900
++++ b/drivers/media/Kconfig	2016-04-04 05:42:08.778804420 +0900
+@@ -149,7 +149,10 @@
+ 	  You may want to disable the network support on embedded devices. If
+ 	  unsure say Y.
+ 
+-# This Kconfig option is used by both PCI and USB drivers
++# Options used by both PCI and USB drivers
++config DVB_PTX_COMMON
++	tristate
++
+ config TTPCI_EEPROM
+ 	tristate
+ 	depends on I2C
+diff -Naur a/drivers/media/usb/em28xx/Kconfig b/drivers/media/usb/em28xx/Kconfig
+--- a/drivers/media/usb/em28xx/Kconfig	2016-04-04 06:26:49.155163313 +0900
++++ b/drivers/media/usb/em28xx/Kconfig	2016-04-04 05:00:41.798544690 +0900
+@@ -59,6 +59,9 @@
  	select DVB_DRX39XYJ if MEDIA_SUBDRV_AUTOSELECT
  	select DVB_SI2168 if MEDIA_SUBDRV_AUTOSELECT
  	select MEDIA_TUNER_SI2157 if MEDIA_SUBDRV_AUTOSELECT
++	select DVB_PTX_COMMON
 +	select DVB_TC90522 if MEDIA_SUBDRV_AUTOSELECT
 +	select MEDIA_TUNER_QM1D1C004X if MEDIA_SUBDRV_AUTOSELECT
  	---help---
  	  This adds support for DVB cards based on the
  	  Empiatech em28xx chips.
-diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-cards.c drivers/media/usb/em28xx/em28xx-cards.c
---- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-cards.c	2015-06-22 14:05:43.000000000 +0900
-+++ drivers/media/usb/em28xx/em28xx-cards.c	2016-03-16 02:48:24.000000000 +0900
-@@ -491,6 +491,20 @@
+diff -Naur a/drivers/media/usb/em28xx/Makefile b/drivers/media/usb/em28xx/Makefile
+--- a/drivers/media/usb/em28xx/Makefile	2016-04-04 06:26:49.155163313 +0900
++++ b/drivers/media/usb/em28xx/Makefile	2016-04-04 04:02:41.513015654 +0900
+@@ -14,3 +14,4 @@
+ ccflags-y += -Idrivers/media/tuners
+ ccflags-y += -Idrivers/media/dvb-core
+ ccflags-y += -Idrivers/media/dvb-frontends
++ccflags-y += -Idrivers/media/pci/ptx
+diff -Naur a/drivers/media/usb/em28xx/em28xx-cards.c b/drivers/media/usb/em28xx/em28xx-cards.c
+--- a/drivers/media/usb/em28xx/em28xx-cards.c	2016-04-04 06:26:49.155163313 +0900
++++ b/drivers/media/usb/em28xx/em28xx-cards.c	2016-04-02 06:02:05.754049224 +0900
+@@ -492,6 +492,20 @@
  	{-1,                             -1,   -1,     -1},
  };
  
@@ -34,7 +58,7 @@ diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-cards.c
  /*
   *  Button definitions
   */
-@@ -2288,6 +2302,17 @@
+@@ -2306,6 +2320,17 @@
  		.has_dvb       = 1,
  		.ir_codes      = RC_MAP_TERRATEC_SLIM_2,
  	},
@@ -52,7 +76,7 @@ diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-cards.c
  };
  EXPORT_SYMBOL_GPL(em28xx_boards);
  
-@@ -2475,6 +2500,8 @@
+@@ -2495,6 +2520,8 @@
  			.driver_info = EM2861_BOARD_LEADTEK_VC100 },
  	{ USB_DEVICE(0xeb1a, 0x8179),
  			.driver_info = EM28178_BOARD_TERRATEC_T2_STICK_HD },
@@ -61,23 +85,21 @@ diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-cards.c
  	{ },
  };
  MODULE_DEVICE_TABLE(usb, em28xx_id_table);
-diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c drivers/media/usb/em28xx/em28xx-dvb.c
---- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c	2015-06-22 14:05:43.000000000 +0900
-+++ drivers/media/usb/em28xx/em28xx-dvb.c	2016-03-16 19:24:04.000000000 +0900
-@@ -12,6 +12,12 @@
+diff -Naur a/drivers/media/usb/em28xx/em28xx-dvb.c b/drivers/media/usb/em28xx/em28xx-dvb.c
+--- a/drivers/media/usb/em28xx/em28xx-dvb.c	2016-04-04 06:26:49.155163313 +0900
++++ b/drivers/media/usb/em28xx/em28xx-dvb.c	2016-04-02 12:08:08.370501447 +0900
+@@ -12,6 +12,10 @@
  
   (c) 2012 Frank Schäfer <fschaefer.oss@googlemail.com>
  
-+ (c) 2016 Satoshi Nagahama <sattnag@aim.com>
++ (c) 2016 Nagahama Satoshi <sattnag@aim.com>
++	  Budi Rachmanto, AreMa Inc. <info@are.ma>
 +	- PLEX PX-BCUD support
-+
-+ (c) 2016 Budi Rachmanto, AreMa Inc. <info@are.ma>
-+	- Fixes for dvb_frontend registration
 +
   Based on cx88-dvb, saa7134-dvb and videobuf-dvb originally written by:
  	(c) 2004, 2005 Chris Pascoe <c.pascoe@itee.uq.edu.au>
  	(c) 2004 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
-@@ -25,11 +31,10 @@
+@@ -25,11 +29,10 @@
  #include <linux/slab.h>
  #include <linux/usb.h>
  
@@ -90,7 +112,7 @@ diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c d
  #include <media/tuner.h>
  #include "tuner-simple.h"
  #include <linux/gpio.h>
-@@ -57,6 +62,8 @@
+@@ -58,6 +61,8 @@
  #include "ts2020.h"
  #include "si2168.h"
  #include "si2157.h"
@@ -99,7 +121,7 @@ diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c d
  
  MODULE_AUTHOR("Mauro Carvalho Chehab <mchehab@infradead.org>");
  MODULE_LICENSE("GPL");
-@@ -785,6 +792,65 @@
+@@ -787,6 +792,65 @@
  	return 0;
  }
  
@@ -165,34 +187,7 @@ diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c d
  static struct mt352_config terratec_xs_mt352_cfg = {
  	.demod_address = (0x1e >> 1),
  	.no_tuner = 1,
-@@ -1561,7 +1627,7 @@
- 			strlcpy(info.type, "si2168", I2C_NAME_SIZE);
- 			info.addr = 0x64;
- 			info.platform_data = &si2168_config;
--			request_module(info.type);
-+			request_module("%s", info.type);
- 			client = i2c_new_device(&dev->i2c_adap[dev->def_i2c_bus], &info);
- 			if (client == NULL || client->dev.driver == NULL) {
- 				result = -ENODEV;
-@@ -1583,7 +1649,7 @@
- 			strlcpy(info.type, "si2157", I2C_NAME_SIZE);
- 			info.addr = 0x60;
- 			info.platform_data = &si2157_config;
--			request_module(info.type);
-+			request_module("%s", info.type);
- 			client = i2c_new_device(adapter, &info);
- 			if (client == NULL || client->dev.driver == NULL) {
- 				module_put(dvb->i2c_client_demod->dev.driver->owner);
-@@ -1621,7 +1687,7 @@
- 			strlcpy(info.type, "si2168", I2C_NAME_SIZE);
- 			info.addr = 0x64;
- 			info.platform_data = &si2168_config;
--			request_module(info.type);
-+			request_module("%s", info.type);
- 			client = i2c_new_device(&dev->i2c_adap[dev->def_i2c_bus], &info);
- 			if (client == NULL || client->dev.driver == NULL) {
- 				result = -ENODEV;
-@@ -1663,6 +1729,19 @@
+@@ -1762,6 +1826,19 @@
  			dvb->i2c_client_tuner = client;
  		}
  		break;
@@ -212,10 +207,10 @@ diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx-dvb.c d
  	default:
  		em28xx_errdev("/2: The frontend of your DVB/ATSC card"
  				" isn't supported yet\n");
-diff -Naur /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx.h drivers/media/usb/em28xx/em28xx.h
---- /usr/src/kernel-4.1.15-2.mga5/drivers/media/usb/em28xx/em28xx.h	2015-06-22 14:05:43.000000000 +0900
-+++ drivers/media/usb/em28xx/em28xx.h	2016-03-16 02:42:57.000000000 +0900
-@@ -144,6 +144,7 @@
+diff -Naur a/drivers/media/usb/em28xx/em28xx.h b/drivers/media/usb/em28xx/em28xx.h
+--- a/drivers/media/usb/em28xx/em28xx.h	2016-04-04 06:26:49.155163313 +0900
++++ b/drivers/media/usb/em28xx/em28xx.h	2016-04-02 06:02:05.754049224 +0900
+@@ -145,6 +145,7 @@
  #define EM2861_BOARD_LEADTEK_VC100                95
  #define EM28178_BOARD_TERRATEC_T2_STICK_HD        96
  #define EM2884_BOARD_ELGATO_EYETV_HYBRID_2008     97

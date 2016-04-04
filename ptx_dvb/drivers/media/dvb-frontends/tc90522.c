@@ -13,7 +13,6 @@
 	GNU General Public License for more details.
  */
 
-#include <linux/pci.h>
 #include "dvb_math.h"
 #include "dvb_frontend.h"
 #include "tc90522.h"

@@ -16,8 +16,8 @@ obj-m := $(TGTS:.ko=.o)
 
 OBJS := $(join $(shell eval source $(PWD)/dkms.conf; echo $${DEST_MODULE_LOCATION[*]} | sed "s|/kernel/||g"), $(addprefix /, $(addsuffix .o, $(MODS))))
 $(shell echo $(join $(TGTS:.ko=-objs:=), $(OBJS)) | sed "s/ /\n/g" > $(PWD)/m~)
-$(foreach OBJ, $(OBJS), $(shell egrep ccflags-y $(PWD)/$(dir $(OBJ))/Makefile >> $(PWD)/m~))
-$(foreach OBJ, $(OBJS), $(shell echo $(patsubst %.o, $(dir $(OBJ))%.o, $(shell egrep $(notdir $(OBJ:.o=-objs)) $(PWD)/$(dir $(OBJ))/Makefile)) >> $(PWD)/m~))
+$(foreach OBJ, $(OBJS), $(shell egrep -s ccflags-y $(PWD)/$(dir $(OBJ))Makefile >> $(PWD)/m~))
+$(foreach OBJ, $(OBJS), $(shell echo $(patsubst %.o, $(dir $(OBJ))%.o, $(shell egrep -s $(notdir $(OBJ:.o=-objs)) $(PWD)/$(dir $(OBJ))Makefile)) >> $(PWD)/m~))
 include $(PWD)/m~
 
 all: $(TGTS)

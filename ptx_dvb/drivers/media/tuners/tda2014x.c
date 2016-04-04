@@ -70,6 +70,22 @@ bool tda2014x_w16(struct dvb_frontend *fe, u16 slvadr, u8 start_bit, u8 nbits, u
 
 int tda2014x_tune(struct dvb_frontend *fe)
 {
+	u64 div10(u64 n, u8 pow)
+	{
+		u64	q, r;
+
+		while (pow--) {
+			q = (n >> 1) + (n >> 2);
+			q = q + (q >> 4);
+			q = q + (q >> 8);
+			q = q + (q >> 16);
+			q = q >> 3;
+			r = n - (((q << 2) + q) << 1);
+			n = q + (r > 9);
+		}
+		return n;
+	}
+
 	enum {
 		TDA2014X_LNA_GAIN_7dB	= 0x0,
 		TDA2014X_LNA_GAIN_10dB	= 0x1,
@@ -102,13 +118,13 @@ int tda2014x_tune(struct dvb_frontend *fe)
 		bInputMuxEnable;
 	u8	PredividerRatio,
 		val;
-	u64	kHz = fe->dtv_property_cache.frequency,
-		ResLsb,
+	u32	kHz = fe->dtv_property_cache.frequency;
+	u64	ResLsb,
+		CalcPow = 6,
 		Premain,
-		CalcPrecision = 1000000,
+		R,
 		kint,
 		Nint,
-		R,
 		DsmFracInReg,
 		DsmIntInReg,
 		v15;
@@ -133,36 +149,36 @@ int tda2014x_tune(struct dvb_frontend *fe)
 
 	ResLsb = (8 - i) * kHz * 1000 / 27;	/* Xtal 27 MHz */
 	kint = ResLsb;
-	v15 = ResLsb / 1000000;
+	v15 = div10(ResLsb, 6);
 	R = 1;
-	Premain = 2;
-	Nint = v15 * R / Premain;
+	Premain = 1;
+	Nint = (v15 * R) >> Premain;
 	if (Nint < 131) {
-		Premain = 1;
-		Nint = v15 * R / Premain;
+		Premain = 0;
+		Nint = (v15 * R) >> Premain;
 		if (Nint > 251) {
-			R = 3;
-			Premain = 4;
-			goto LABEL_36;
-		}
-		if (Nint < 131) {
 			R = 3;
 			Premain = 2;
 			goto LABEL_36;
 		}
+		if (Nint < 131) {
+			R = 3;
+			Premain = 1;
+			goto LABEL_36;
+		}
 	} else if (Nint > 251) {
-		Premain = 4;
-		Nint = v15 * R / Premain;
+		Premain = 2;
+		Nint = (v15 * R) >> Premain;
 		if (Nint > 251) {
 			R = 3;
-			Premain = 4;
+			Premain = 2;
 		}
 LABEL_36:
-		Nint = v15 * R / Premain;
+		Nint = (v15 * R) >> Premain;
 		if (Nint < 131 || Nint > 251)
 			return -ERANGE;
 	}
-	switch (100 * R / Premain) {
+	switch ((100 * R) >> Premain) {
 	case 25:
 		kint = ResLsb / 4;
 		break;
@@ -180,16 +196,16 @@ LABEL_36:
 	default:
 		return -ERANGE;
 	}
-	kint		= (kint / 10) * 10;
+	kint		= div10(kint, 1) * 10;
 	ePllRefClkRatio	= R == 2 ? 1 : R == 3 ? 2 : 0;
-	PredividerRatio	= Premain == 2 ? 0 : 1;
-	DsmIntInReg	= kint / 1000000;
+	PredividerRatio	= Premain == 1 ? 0 : 1;
+	DsmIntInReg	= div10(kint, 6);
 	DsmFracInReg	= kint - 1000000 * DsmIntInReg;
 	for (i = 0; i < 16; i++) {
 		DsmFracInReg *= 2;
 		if (DsmFracInReg > 0xFFFFFFF && i != 15) {
-			DsmFracInReg /= 10;
-			CalcPrecision /= 10;
+			DsmFracInReg = div10(DsmFracInReg, 1);
+			CalcPow--;
 		}
 	}
 	return	!(tda2014x_w16(fe, 3, 6, 2, 0, 1, 6, ePllRefClkRatio)	&&
@@ -197,7 +213,7 @@ LABEL_36:
 		/* SetPllDividerConfig */
 		tda2014x_w16(fe, 0x1A, 5, 1, 0, 1, 6, PredividerRatio)			&&
 		tda2014x_w16(fe, 0x1E, 0, 8, 0, 0, 6, DsmIntInReg - 128)		&&
-		tda2014x_w16(fe, 0x1F, 0, 0x10, 2, 0, 6, DsmFracInReg / CalcPrecision)	&&
+		tda2014x_w16(fe, 0x1F, 0, 0x10, 2, 0, 6, div10(DsmFracInReg, CalcPow))	&&
 
 		/* ProgramVcoChannelChange */
 		tda2014x_r8(fe, 0x12, 0, 8, &val)				&&

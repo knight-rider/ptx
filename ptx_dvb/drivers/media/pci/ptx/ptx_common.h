@@ -1,13 +1,13 @@
 /*
- * Defs & procs for PT3 & PX-Q3PE DVB driver
- *
- * Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
- *
- * This program is distributed in hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
+	Definitions & prototypes for PT3, PX-Q3PE, PX-BCUD and other DVB drivers
+
+	Copyright (C) Budi Rachmanto, AreMa Inc. <info@are.ma>
+
+	This program is distributed in hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+*/
 
 #ifndef	PTX_COMMON_H
 #define PTX_COMMON_H
@@ -18,6 +18,8 @@
 #include "dvb_demux.h"
 #include "dvb_frontend.h"
 #include "dmxdev.h"
+
+#define PTX_AUTH "Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>"
 
 enum ePTX {
 	PTX_TS_SIZE	= 188,
