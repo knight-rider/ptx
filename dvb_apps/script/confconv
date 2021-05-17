@@ -1,6 +1,0 @@
-#!/bin/bash
-PREFIX='BS'
-if [ x"$1" == 'x-c' ]; then
-  PREFIX='CS'
-fi
-exec /bin/sed -e 's/^\([^#:][^:]*\):\([^:]*\):\([0-9a-fA-F]*\)/# \1\n'$PREFIX'\3:\2:\3/'

@@ -1,0 +1,50 @@
+#!/bin/bash
+# transform mplayer/mpv style channels.conf to libdvbv5 style
+# usage: $0 < ~/.config/mpv/channels.conf.isdbs
+
+while IFS=':' read -r name props sid; do
+  [[ -z "$sid" ]] && continue
+
+  echo "[${name}]"
+
+  echo "$props" | tr '|' '\n' | \
+  while read -r item; do
+    key=${item%%=*}
+    key=${key#DTV_}
+    value=${item#*=}
+
+    if [ $key = "DELIVERY_SYSTEM" ]; then
+      if [ $value = 8 ]; then
+        value="ISDBT"
+      else
+        value="ISDBS"
+      fi
+    elif [ $key = "VOLTAGE" ]; then
+      if [ $value = 1 ]; then
+        value="18"
+      elif [ $value = 0 ]; then
+        value="13"
+      else
+        value="OFF"
+      fi
+    elif [ $key = "ISDBS_TS_ID" ]; then
+      key="STREAM_ID"
+    elif [ $key = "FREQUENCY" ]; then
+      value=$(($value + 10678000))
+    fi
+
+    echo -e -n "\t"
+    echo "$key = $value"
+
+    if [ $key = "DELIVERY_SYSTEM" ]; then
+      echo -e "\tCOUNTRY = JP"
+      if [ $value = "ISDBS" ]; then
+        echo -e "\tLNB = 110BS"
+        echo -e "\tPOLARIZATION = RIGHT"
+      fi
+    fi
+  done
+
+  echo -e "\tSERVICE_ID = $sid"
+  echo
+done
