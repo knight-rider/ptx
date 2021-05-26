@@ -7,18 +7,18 @@ Status: stable
 
 Features:
 1. in addition to the real frequency:
-	ISDB-S : freq. channel ID
-	ISDB-T : freq# (I/O# +128), ch#, ch# +64 for CATV
+-	ISDB-S : freq. channel ID
+-	ISDB-T : freq# (I/O# +128), ch#, ch# +64 for CATV
 2. in addition to TSID:
-	ISDB-S : slot#
+-	ISDB-S : slot#
 
 Supported Cards & Main components:
 A. EarthSoft PT3:
 1. Altera	EP4CGX15BF14C8N	: customized FPGA PCI bridge
 2. Toshiba	TC90522XBG	: quad demodulator (2ch OFDM + 2ch 8PSK)
 3. Sharp	VA4M6JC2103	: contains 2 ISDB-S + 2 ISDB-T tuners
-	ISDB-S : Sharp QM1D1C0042 RF-IC, chip ver. 0x48
-	ISDB-T : MaxLinear CMOS Hybrid TV MxL301RF
+-	ISDB-S : Sharp QM1D1C0042 RF-IC, chip ver. 0x48
+-	ISDB-T : MaxLinear CMOS Hybrid TV MxL301RF
 
 B. PLEX PX-Q3PE:
 1. ASICEN	ASV5220		: PCI-E bridge
