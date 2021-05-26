@@ -61,12 +61,13 @@ FILENAME	& SUPPORTED CHIPS:
 Full package:
 - URL:	https://github.com/knight-rider/ptx
 - buildable as standalone, DKMS or tree embedded module
-- インストール方法:
-	DKMS がなければ
-	# make install
-	DKMS があれば（自動アップデート）
-	$ chmod +x dkms.install dkms.uninstall
-	$ ./dkms.install
+
+インストール方法:
+- DKMS がなければ
+	make install
+- DKMS があれば（自動アップデート）
+	chmod +x dkms.install dkms.uninstall;
+	./dkms.install
 
 PTX 用ツール集:
 - apps   	: アプリ集
