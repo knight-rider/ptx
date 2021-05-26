@@ -13,6 +13,7 @@ Features:
 -	ISDB-S : slot#
 
 Supported Cards & Main components:
+
 A. EarthSoft PT3:
 1. Altera	EP4CGX15BF14C8N	: customized FPGA PCI bridge
 2. Toshiba	TC90522XBG	: quad demodulator (2ch OFDM + 2ch 8PSK)
@@ -33,6 +34,7 @@ C. PLEX PX-BCUD (ISDB-S USB dongle)
 3. Sharp	QM1D1C0045_2	: ISDB-S RF-IC, chip ver. 0x68
 
 Notes:
+
 This is a complex but smartly polished driver package containing 2 (dual head)
 PCI-E bridge I/F drivers, single demodulator frontend, and 4 (quad tail) tuner drivers,
 plus, simplified Nagahama's patch for PLEX PX-BCUD (ISDB-S USB dongle).
