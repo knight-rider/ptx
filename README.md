@@ -49,15 +49,14 @@ Also, currently dvb_frontend's .demodulator_priv & .tuner_priv are of type (void
 These should be changed to (struct i2c_client *), IMHO. Private data for demodulator
 or tuner should be attached under i2c_client, using i2c_set_clientdata() for instance.
 
-FILENAME	SUPPORTED CHIPS
-========	===============
-tc90522.c	TC90522XBG, TC90532XBG,...
-tda2014x.c	TDA20142
-qm1d1c004x.c	QM1D1C0042, QM1D1C0045, QM1D1C0045_2
-nm131.c		NM131, NM130, NM120
-mxl301rf.c	MxL301RF
-pt3_pci.c	EP4CGX15BF14C8N
-pxq3pe_pci.c	ASV5220
+FILENAME	& SUPPORTED CHIPS:
+- tc90522.c	: TC90522XBG, TC90532XBG,...
+- tda2014x.c	: TDA20142
+- qm1d1c004x.c	: QM1D1C0042, QM1D1C0045, QM1D1C0045_2
+- nm131.c	: NM131, NM130, NM120
+- mxl301rf.c	: MxL301RF
+- pt3_pci.c	: EP4CGX15BF14C8N
+- pxq3pe_pci.c	: ASV5220
 
 Full package:
 - URL:	https://github.com/knight-rider/ptx
@@ -69,7 +68,7 @@ Full package:
 	$ chmod +x dkms.install dkms.uninstall
 	$ ./dkms.install
 
-PTx 用ツール集
+PTX 用ツール集
 ============
 apps   	:	アプリ集
 drivers	:	PX-Q3PE と PT3 ドライバ（cdev 版と DVB 版）
