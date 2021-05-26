@@ -68,11 +68,10 @@ Full package:
 	$ chmod +x dkms.install dkms.uninstall
 	$ ./dkms.install
 
-PTX 用ツール集
-============
-apps   	:	アプリ集
-drivers	:	PX-Q3PE と PT3 ドライバ（cdev 版と DVB 版）
-		PX-BCUD DVB ドライバ 長浜版（改）
+PTX 用ツール集:
+- apps   	: アプリ集
+- drivers	: PX-Q3PE と PT3 ドライバ（cdev 版と DVB 版）、
+		  PX-BCUD DVB ドライバ 長浜版（改）
 
 PX-Q3PE は、ctrl-alt-del 等の reboot（warm boot）ではリセットされません。
 （ドライバで出来るかもしれないが方法が分かりません。誰か教えて下さい）
