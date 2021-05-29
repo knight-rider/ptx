@@ -309,10 +309,10 @@ int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct ptx_adap	*adap;
 	struct pt3_card	*c;
 	struct ptx_subdev_info	pt3_subdev_info[] = {
-		{SYS_ISDBT, 0b00010000, TC90522_MODNAME, 0x62, MXL301RF_MODNAME},
-		{SYS_ISDBS, 0b00010001, TC90522_MODNAME, 0x63, QM1D1C004X_MODNAME},
-		{SYS_ISDBT, 0b00010010, TC90522_MODNAME, 0x61, MXL301RF_MODNAME},
-		{SYS_ISDBS, 0b00010011, TC90522_MODNAME, 0x60, QM1D1C004X_MODNAME},
+		{0b00010001, TC90522_MODNAME, 0x63, QM1D1C004X_MODNAME,	{SYS_ISDBS}},
+		{0b00010011, TC90522_MODNAME, 0x60, QM1D1C004X_MODNAME,	{SYS_ISDBS}},
+		{0b00010000, TC90522_MODNAME, 0x62, MXL301RF_MODNAME,	{SYS_ISDBT}},
+		{0b00010010, TC90522_MODNAME, 0x61, MXL301RF_MODNAME,	{SYS_ISDBT}},
 	};
 	struct ptx_card	*card	= ptx_alloc(pdev, KBUILD_MODNAME, ARRAY_SIZE(pt3_subdev_info),
 					sizeof(struct pt3_card), sizeof(struct pt3_adap), pt3_lnb);

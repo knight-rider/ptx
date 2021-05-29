@@ -28,9 +28,9 @@ enum ePTX {
 };
 
 struct ptx_subdev_info {
-	enum fe_delivery_system	delsys;
 	u8	demod_addr,	*demod_name,
 		tuner_addr,	*tuner_name;
+	enum fe_delivery_system	delsys[MAX_DELSYS];
 };
 
 struct ptx_card {

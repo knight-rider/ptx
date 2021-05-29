@@ -128,6 +128,7 @@ void ptx_register_subdev(struct i2c_adapter *i2c, struct dvb_frontend *fe, u16 a
 	};
 
 	strlcpy(info.type, name, I2C_NAME_SIZE);
+	pr_info("%s %s", __func__, info.type);
 	if (request_module("%s", info.type) < 0) {
 		pr_err("%s ERROR request_module %s", __func__, info.type);
 		return;
@@ -156,14 +157,15 @@ void ptx_unregister_fe(struct dvb_frontend *fe)
 
 struct dvb_frontend *ptx_register_fe(struct i2c_adapter *i2c, struct dvb_adapter *dvb, const struct ptx_subdev_info *info)
 {
-	struct dvb_frontend *fe;
+	struct dvb_frontend	*fe;
+	int			i;
 
 	if (!dvb || !info || !(fe = kzalloc(sizeof(struct dvb_frontend), GFP_KERNEL)))
 		return	NULL;
 	ptx_register_subdev(i2c, fe, info->demod_addr, info->demod_name);
 	ptx_register_subdev(i2c, fe, info->tuner_addr, info->tuner_name);
-	if (info->delsys)
-		fe->ops.delsys[0] = info->delsys;
+	for (i = 0; i < MAX_DELSYS; i++)
+		fe->ops.delsys[i] = info->delsys[i];
 	if (!fe->demodulator_priv || !fe->tuner_priv || (dvb && dvb_register_frontend(dvb, fe))) {
 		ptx_unregister_fe(fe);
 		return	NULL;
