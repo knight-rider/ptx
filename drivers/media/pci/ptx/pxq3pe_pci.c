@@ -29,7 +29,7 @@ static int	ni,
 		xor[4]	= {0x2F, 0x46, 0x56, 0xE3};
 module_param_array(idx, int, &ni, 0);
 module_param_array(xor, int, &nx, 0);
-
+static u8	crypto_seed[16]	= {0x0B, 0x24, 0x71, 0xE3, 0xC6, 0x1A, 0xF7, 0xCD, 0xC4, 0xF4, 0xF8, 0xA6, 0xF0, 0xB2, 0x01, 0x00};
 static struct pci_device_id pxq3pe_id_table[] = {
 	{0x188B, 0x5220, 0x0B06, 0x0002, 0, 0, 0},
 	{}
@@ -376,10 +376,7 @@ int pxq3pe_thread(void *dat)
 	set_freezable();
 	while (!kthread_should_stop()) {
 		u8	*rbuf	= &p->sBuf[p->sBufStart];
-		int	i	= 0,
-			j	= 0,
-			k,
-			sz	= p->sBufSize - p->sBufStart;
+		int sz	= p->sBufSize - p->sBufStart;
 
 		try_to_freeze();
 		if (!p->sBufByteCnt) {
@@ -388,13 +385,6 @@ int pxq3pe_thread(void *dat)
 		}
 		if (sz > p->sBufByteCnt)
 			sz = p->sBufByteCnt;
-		while (j < sz / PTX_TS_SIZE) {
-			j++;
-			i += 4;
-			while (i < j * PTX_TS_SIZE)
-				for (k = 0; k < 8; k++, i++)
-					rbuf[i] ^= xor[idx[k]];
-		}
 		dvb_dmx_swfilter(&adap->demux, rbuf, sz);
 		p->sBufStart	= (p->sBufStart + sz) % p->sBufSize;
 		p->sBufByteCnt -= sz;
@@ -575,7 +565,7 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 	pxq3pe_w_gpio0(card, 1, 1);
 
 	for (i = 0; i < 16; i++)
-		if (!pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, PTX_AUTH + i, 1, PXQ3PE_MOD_GPIO))
+		if (!pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, crypto_seed[i], 1, PXQ3PE_MOD_GPIO))
 			break;
 	if (i < 16 || !pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 5, &regctl, 1, PXQ3PE_MOD_GPIO))
 		return ptx_abort(pdev, pxq3pe_remove, -EIO, "hw_init failed i=%d", i);
