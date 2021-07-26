@@ -16,8 +16,7 @@
 #include "ptx_common.h"
 #include "tc90522.h"
 
-#define MOD_AUTH "Budi Rachmanto, AreMa Inc. <knightrider(@)are.ma>"
-MODULE_AUTHOR(MOD_AUTH);
+MODULE_AUTHOR(PTX_AUTH);
 MODULE_DESCRIPTION("PLEX PX-Q3PE Driver");
 MODULE_LICENSE("GPL");
 
@@ -1571,7 +1570,7 @@ static int pxq3pe_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id
 	pxq3pe_w_gpio0(card, 0, 1);
 	pxq3pe_w_gpio0(card, 1, 1);
 	for (i = 0; i < 16; i++)
-		if (!pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, MOD_AUTH + i, 1, PXQ3PE_MOD_GPIO))
+		if (!pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 0x10 + i, PTX_AUTH + i, 1, PXQ3PE_MOD_GPIO))
 			break;
 	v8 = 0xA0;
 	if (i < 16 || !pxq3pe_w(card, PXQ3PE_I2C_ADR_GPIO, 5, &v8, 1, PXQ3PE_MOD_GPIO))

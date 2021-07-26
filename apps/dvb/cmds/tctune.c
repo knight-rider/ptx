@@ -76,12 +76,12 @@ int main(int argc, char *argv[]) {
 		close(fe);
 	}
 	if (i == DVB_MAX_ADAPTERS) {
-		fprintf(stderr, "Cannot find adapter\n");
+		fprintf(stderr, "No available adapter\n");
 		return -1;
 	}
 	sprintf(linebuf, "/dev/dvb/adapter%d/demux0", i);
 	if ((fd = open(linebuf, O_RDWR)) < 0) {
-		perror("open");
+		perror("open demux");
 		goto OUT1;
 	}
 

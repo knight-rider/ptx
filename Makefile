@@ -1,5 +1,6 @@
 # 通常は弄らない。dkms.conf 或いは下位 Makefile を編集して下さい。
 
+PWD ?= $(shell pwd)
 KVER ?= $(shell uname -r)
 KDIR := /lib/modules/$(KVER)
 KBUILD := $(KDIR)/build
